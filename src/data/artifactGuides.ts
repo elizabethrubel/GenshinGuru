@@ -1,0 +1,384 @@
+import type { Character } from '../types/genshin';
+
+export interface ArtifactGuide {
+  primarySet: string;
+  alternativeSet: string;
+  sands: string;
+  goblet: string;
+  circlet: string;
+  substats: string;
+  note: string;
+}
+
+export const CHARACTER_ARTIFACT_GUIDES: Record<string, ArtifactGuide> = {
+  traveller: {
+    primarySet: '4pc Disenchantment in Deep Shadow',
+    alternativeSet: '4pc Heart of the Furnace (Off-Field Support)',
+    sands: 'ATK%',
+    goblet: 'ATK% or Cryo DMG',
+    circlet: 'CRIT DMG',
+    substats: 'CRIT DMG > ATK% > CRIT Rate > ER%',
+    note: 'Boosts Stellar-Conduct DMG by 40% and grants +16% CRIT Rate on Stellar-Conduct targets for Cryo Traveller’s Enhanced CA & Burst.',
+  },
+  fischl: {
+    primarySet: '4pc Golden Troupe',
+    alternativeSet: '4pc Tenacity of the Millelith (Team ATK Buff)',
+    sands: 'ATK% or EM',
+    goblet: 'Electro DMG',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'CRIT > ATK% > EM > ER%',
+    note: 'Massively amplifies Oz’s off-field Skill damage (+70% Elemental Skill DMG while off-field).',
+  },
+  bennett: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '4pc Instructor (Reaction EM Buff)',
+    sands: 'ER%',
+    goblet: 'HP%',
+    circlet: 'Healing Bonus or HP%',
+    substats: 'ER% (200%+) > HP% > Flat HP',
+    note: 'Stacks +20% team ATK on top of Bennett’s massive Burst ATK buff; prioritize high Base ATK sword and ER.',
+  },
+  zibai: {
+    primarySet: "4pc Night of the Sky's Unveiling",
+    alternativeSet: '4pc Husk of Opulent Dreams',
+    sands: 'DEF%',
+    goblet: 'DEF%',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'CRIT > DEF% > EM > ER%',
+    note: 'Signature Moonsign DPS set granting CRIT Rate, EM, and Lunar-Crystallize DMG amplification.',
+  },
+  flins: {
+    primarySet: "4pc Night of the Sky's Unveiling",
+    alternativeSet: '4pc Gilded Dreams',
+    sands: 'ATK%',
+    goblet: 'ATK%',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'ER% (to req) > CRIT > ATK% > EM',
+    note: 'Best-in-slot for on-field Lunar-Charged carries — scales Flins’s CRIT Rate, EM, and Lunar reaction damage.',
+  },
+  lauma: {
+    primarySet: "4pc Silken Moon's Serenade",
+    alternativeSet: '4pc Deepwood Memories (if no other Dendro holds it)',
+    sands: 'EM or ER%',
+    goblet: 'EM',
+    circlet: 'EM or CRIT',
+    substats: 'EM > ER% > CRIT',
+    note: 'Provides Energy Recharge, party-wide EM, and Lunar-Bloom DMG bonus; swap to Deepwood if nobody else shreds Dendro RES.',
+  },
+  kaeya: {
+    primarySet: '4pc Emblem of Severed Fate',
+    alternativeSet: '4pc Blizzard Strayer (Freeze) / 4pc Noblesse Oblige',
+    sands: 'ATK% or ER%',
+    goblet: 'Cryo DMG',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'ER% > CRIT > ATK% > EM',
+    note: 'Smooths Burst uptime while turning Energy Recharge directly into off-field Cryo Burst damage.',
+  },
+  lisa: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '4pc Emblem of Severed Fate / 4pc Thundering Fury',
+    sands: 'ER%',
+    goblet: 'Electro DMG',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'ER% (180%+) > CRIT > ATK% > EM',
+    note: 'Pairs her 15% DEF shred Burst with a +20% team ATK buff; prioritize high ER to burst every rotation.',
+  },
+  barbara: {
+    primarySet: '4pc Ocean-Hued Clam',
+    alternativeSet: '4pc Instructor (Lunar / Bloom EM Buff)',
+    sands: 'HP%',
+    goblet: 'HP%',
+    circlet: 'Healing Bonus or HP%',
+    substats: 'HP% > ER% > EM',
+    note: 'Converts Barbara’s steady healing into AoE physical bubble bursts while maximizing survivability.',
+  },
+  xiangling: {
+    primarySet: '4pc Emblem of Severed Fate',
+    alternativeSet: '4pc Crimson Witch of Flames',
+    sands: 'ER% or EM',
+    goblet: 'Pyro DMG',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'ER% (180–210%) > CRIT > EM > ATK%',
+    note: 'Undisputed best set for Pyronado — solves Xiangling’s 80-Energy Burst cost while buffing Burst DMG up to 75%.',
+  },
+  'yumemizuki-mizuki': {
+    primarySet: '4pc Viridescent Venerer',
+    alternativeSet: '2pc EM + 2pc EM (temporary)',
+    sands: 'EM',
+    goblet: 'EM',
+    circlet: 'EM',
+    substats: 'EM > ER% > HP%',
+    note: 'Triple-EM Viridescent Venerer maximizes both her on-field Swirl driver damage, healing scaling, and -40% elemental RES shred.',
+  },
+  noelle: {
+    primarySet: '4pc Husk of Opulent Dreams',
+    alternativeSet: '4pc Marechaussee Hunter (with HP drain) / 4pc Gladiator',
+    sands: 'DEF%',
+    goblet: 'Geo DMG or DEF%',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'CRIT > ER% (130%+) > DEF%',
+    note: 'Stacks DEF% and Geo DMG Bonus for stronger shields, bigger heals, and sweeping Geo Burst damage.',
+  },
+  sucrose: {
+    primarySet: '4pc Viridescent Venerer',
+    alternativeSet: '4pc Instructor (niche)',
+    sands: 'EM',
+    goblet: 'EM',
+    circlet: 'EM',
+    substats: 'EM > ER%',
+    note: 'Full EM Viridescent Venerer shreds -40% Elemental RES while sharing massive EM to your whole squad.',
+  },
+  aino: {
+    primarySet: "4pc Silken Moon's Serenade",
+    alternativeSet: '4pc Noblesse Oblige / 4pc Instructor',
+    sands: 'ER%',
+    goblet: 'Hydro DMG or EM',
+    circlet: 'CRIT Rate (Favonius) or EM',
+    substats: 'ER% (180%+) > EM > CRIT Rate',
+    note: 'Best Moonsign support set — fuels Aino’s Burst uptime and boosts the entire party’s EM and Lunar reaction DMG.',
+  },
+  dehya: {
+    primarySet: '4pc Tenacity of the Millelith',
+    alternativeSet: '4pc Deepwood Memories (Burgeon / Burning)',
+    sands: 'HP%',
+    goblet: 'HP%',
+    circlet: 'HP%',
+    substats: 'HP% > ER% > CRIT Rate (Favonius)',
+    note: 'Her off-field Skill procs refresh +20% team ATK and +30% shield strength effortlessly.',
+  },
+  candace: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '4pc Emblem of Severed Fate / 4pc Instructor',
+    sands: 'ER% or HP%',
+    goblet: 'HP%',
+    circlet: 'HP% or CRIT Rate (Favonius)',
+    substats: 'ER% (180%+) > HP%',
+    note: 'Stacks +20% team ATK alongside her Hydro infusion and Normal Attack DMG bonus.',
+  },
+  jahoda: {
+    primarySet: '4pc Viridescent Venerer',
+    alternativeSet: "4pc Silken Moon's Serenade (Dendro/Geo Lunar teams)",
+    sands: 'ER% or ATK%',
+    goblet: 'ATK%',
+    circlet: 'Healing Bonus or ATK%',
+    substats: 'ER% (170%+) > ATK% > EM',
+    note: 'Provides -40% Elemental RES shred for Flins/Electro-Hydro teams; switch to Silken Moon when paired with Lauma or Zibai.',
+  },
+  kaveh: {
+    primarySet: '4pc Deepwood Memories',
+    alternativeSet: '4pc Flower of Paradise Lost / 4pc Ocean-Hued Clam',
+    sands: 'ER% or EM',
+    goblet: 'EM',
+    circlet: 'EM',
+    substats: 'ER% (180%+) > EM',
+    note: 'Ensures -30% Dendro RES shred on enemies while stacking EM for Bloom detonations and self-healing.',
+  },
+  kachina: {
+    primarySet: '4pc Scroll of the Hero of Cinder City',
+    alternativeSet: '4pc Husk of Opulent Dreams',
+    sands: 'DEF%',
+    goblet: 'Geo DMG or DEF%',
+    circlet: 'CRIT Rate / DEF%',
+    substats: 'ER% > CRIT > DEF%',
+    note: 'Nightsoul Blessing triggers the full +40% Elemental DMG team buff for Geo and the reacted element.',
+  },
+  'lan-yan': {
+    primarySet: '4pc Viridescent Venerer',
+    alternativeSet: '2pc ATK% + 2pc ATK% (Max Shield)',
+    sands: 'ATK%',
+    goblet: 'ATK%',
+    circlet: 'ATK%',
+    substats: 'ATK% > ER% > EM',
+    note: 'Combines -40% VV Elemental RES shred with ATK-scaling elemental absorption shields.',
+  },
+  amber: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '4pc Instructor',
+    sands: 'ER% or ATK%',
+    goblet: 'Pyro DMG',
+    circlet: 'CRIT Rate / DMG',
+    substats: 'ER% > CRIT > ATK%',
+    note: 'Low-cost 40-Energy Burst makes Amber a reliable Noblesse Oblige or Instructor buffer.',
+  },
+  collei: {
+    primarySet: '4pc Deepwood Memories',
+    alternativeSet: '4pc Instructor / 4pc Emblem of Severed Fate',
+    sands: 'ER%',
+    goblet: 'Dendro DMG',
+    circlet: 'CRIT Rate (Favonius)',
+    substats: 'ER% (180%+) > CRIT Rate > EM',
+    note: 'Easy off-field Dendro RES shred holder when paired with another Dendro carry.',
+  },
+  lynette: {
+    primarySet: '4pc Viridescent Venerer',
+    alternativeSet: '4pc Noblesse Oblige',
+    sands: 'ER% or ATK%',
+    goblet: 'Anemo DMG',
+    circlet: 'CRIT Rate / DMG',
+    substats: 'ER% (170%+) > CRIT > ATK%',
+    note: 'Shreds -40% Elemental RES with Swirl while providing taunt utility, team ATK buff, and Arkhe: Ousia.',
+  },
+  baizhu: {
+    primarySet: '4pc Deepwood Memories',
+    alternativeSet: '4pc Song of Days Past / 4pc Ocean-Hued Clam',
+    sands: 'ER% or HP%',
+    goblet: 'HP%',
+    circlet: 'HP%',
+    substats: 'ER% (180%+) > HP% (aim for 50k HP)',
+    note: 'Holds Deepwood so Lauma can run Silken Moon’s Serenade, while stacking toward 50,000 HP for maximum Dendro reaction buffs.',
+  },
+  mona: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '4pc Emblem of Severed Fate / 4pc Tenacity of the Millelith',
+    sands: 'ER%',
+    goblet: 'Hydro DMG',
+    circlet: 'CRIT Rate / DMG',
+    substats: 'ER% (200%+) > CRIT > ATK%',
+    note: 'Pairs +20% team ATK with her massive Omen DMG% Burst buff; run high ER for reliable uptime.',
+  },
+  prune: {
+    primarySet: '4pc Celestial Gift',
+    alternativeSet: '4pc Viridescent Venerer / 4pc Noblesse Oblige',
+    sands: 'ER% or ATK%',
+    goblet: 'ATK%',
+    circlet: 'ATK%',
+    substats: 'ER% (180–200%) > ATK% > CRIT Rate (Favonius)',
+    note: 'Hexerei support set granting high party Elemental DMG Bonus; stack ATK% after meeting Burst ER needs.',
+  },
+  diona: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '2pc HP% + 2pc HP% (Max Shield)',
+    sands: 'ER% or HP%',
+    goblet: 'HP%',
+    circlet: 'HP% or Healing Bonus',
+    substats: 'ER% (170%+) > HP%',
+    note: 'Adds +20% team ATK on top of her Cryo shield, healing, and Cryo particle generation for Cryo Traveller.',
+  },
+  alyosha: {
+    primarySet: '4pc Heart of the Furnace',
+    alternativeSet: '4pc Noblesse Oblige (if teammate holds Heart)',
+    sands: 'ER% or ATK%',
+    goblet: 'ATK%',
+    circlet: 'CRIT Rate (Favonius) or ATK%',
+    substats: 'ER% (to req) > CRIT Rate > ATK%',
+    note: 'Raises party-wide Stellar Glimmer / Stellar-Conduct reaction DMG by 50% while boosting Alyosha’s ATK-scaling heals.',
+  },
+  'kujou-sara': {
+    primarySet: '4pc Emblem of Severed Fate',
+    alternativeSet: '4pc Noblesse Oblige',
+    sands: 'ER%',
+    goblet: 'Electro DMG',
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'ER% (180%+) > CRIT > ATK%',
+    note: 'Maximizes her Burst nuke while keeping her Electro ATK buff cycling every rotation.',
+  },
+  yaoyao: {
+    primarySet: '4pc Deepwood Memories',
+    alternativeSet: '4pc Tenacity of the Millelith',
+    sands: 'HP% or ER%',
+    goblet: 'HP%',
+    circlet: 'Healing Bonus or HP%',
+    substats: 'HP% > ER% > CRIT Rate (Favonius)',
+    note: 'Yuegui radishes reliably refresh -30% Dendro RES shred while healing your active character.',
+  },
+  gaming: {
+    primarySet: '4pc Marechaussee Hunter',
+    alternativeSet: '4pc Crimson Witch of Flames',
+    sands: 'EM or ATK%',
+    goblet: 'Pyro DMG',
+    circlet: 'CRIT DMG',
+    substats: 'CRIT DMG > EM > ATK% > ER% (130%)',
+    note: 'His built-in HP drain/heal activates +36% CRIT Rate effortlessly for huge Vaporize or Melt plunges.',
+  },
+  chevreuse: {
+    primarySet: '4pc Song of Days Past',
+    alternativeSet: '4pc Noblesse Oblige / 2pc HP% + 2pc HP%',
+    sands: 'HP%',
+    goblet: 'HP%',
+    circlet: 'HP% or Healing Bonus',
+    substats: 'HP% (target 40,000 HP) > ER%',
+    note: 'Reaching 40,000 HP maxes out her +40% Pyro/Electro ATK buff while Song of Days Past adds flat active-character DMG.',
+  },
+  thoma: {
+    primarySet: '4pc Flower of Paradise Lost',
+    alternativeSet: '4pc Gilded Dreams (Burgeon) / 2pc ER + 2pc HP (Shield)',
+    sands: 'ER% or EM',
+    goblet: 'EM (Burgeon) or HP%',
+    circlet: 'EM (Burgeon) or HP%',
+    substats: 'ER% (180%+) > EM (Burgeon) or HP% (Shield)',
+    note: 'Stack ER + EM for Burgeon triggers, or ER + HP% when using Thoma purely as a stacking Pyro shielder.',
+  },
+  xinyan: {
+    primarySet: '4pc Tenacity of the Millelith',
+    alternativeSet: '4pc Pale Flame (Physical DPS) / 4pc Noblesse Oblige',
+    sands: 'DEF% or ATK%',
+    goblet: 'DEF% or Physical DMG',
+    circlet: 'DEF% or CRIT',
+    substats: 'ER% > DEF% (Shield) or CRIT (DPS)',
+    note: 'Use Tenacity + DEF% for utility shielding, or Pale Flame for Physical Burst/Charged Attack builds.',
+  },
+};
+
+export function getArtifactGuide(char: Character): ArtifactGuide {
+  const exact = CHARACTER_ARTIFACT_GUIDES[char.id];
+  if (exact) return exact;
+
+  // Smart fallback for any newly added character from live Google Sheets sync
+  if (char.mechanicTags.includes('stellar-conduct')) {
+    return {
+      primarySet: char.isOnField
+        ? '4pc Disenchantment in Deep Shadow'
+        : '4pc Heart of the Furnace',
+      alternativeSet: '4pc Noblesse Oblige',
+      sands: 'ATK% or ER%',
+      goblet: 'ATK% or Elemental DMG',
+      circlet: 'CRIT Rate / CRIT DMG',
+      substats: 'ER% (to req) > CRIT > ATK%',
+      note: 'Tailored for Stellar Glimmer / Stellar-Conduct scaling.',
+    };
+  }
+  if (char.moonsignLevel > 0) {
+    return {
+      primarySet: char.isOnField
+        ? "4pc Night of the Sky's Unveiling"
+        : "4pc Silken Moon's Serenade",
+      alternativeSet: '4pc Gilded Dreams',
+      sands: 'EM or ER%',
+      goblet: 'EM or Elemental DMG',
+      circlet: 'CRIT or EM',
+      substats: 'ER% > CRIT > EM',
+      note: 'Optimal Moonsign Lunar reaction artifact set.',
+    };
+  }
+  if (char.element === 'Anemo') {
+    return {
+      primarySet: '4pc Viridescent Venerer',
+      alternativeSet: '4pc Noblesse Oblige',
+      sands: 'ER% or EM',
+      goblet: 'EM or Anemo DMG',
+      circlet: 'EM or CRIT',
+      substats: 'ER% > EM > CRIT',
+      note: 'Standard -40% Elemental RES shred for Anemo units.',
+    };
+  }
+  if (char.element === 'Dendro') {
+    return {
+      primarySet: '4pc Deepwood Memories',
+      alternativeSet: '4pc Gilded Dreams',
+      sands: 'EM or ER%',
+      goblet: 'Dendro DMG or EM',
+      circlet: 'CRIT or EM',
+      substats: 'ER% > EM > CRIT',
+      note: 'Provides -30% Dendro RES shred for Dendro teams.',
+    };
+  }
+  return {
+    primarySet: char.isHealer ? '4pc Noblesse Oblige' : '4pc Emblem of Severed Fate',
+    alternativeSet: '2pc Elemental DMG + 2pc ATK%',
+    sands: 'ER% or ATK%',
+    goblet: `${char.element} DMG`,
+    circlet: 'CRIT Rate / CRIT DMG',
+    substats: 'ER% > CRIT > ATK%',
+    note: 'Versatile all-purpose set for newly synced characters.',
+  };
+}

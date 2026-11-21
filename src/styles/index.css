@@ -1098,6 +1098,39 @@ button {
   line-height: 1.3;
 }
 
+.roster-item-artifact {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--gold);
+  margin-top: 4px;
+  line-height: 1.3;
+  max-width: 150px;
+}
+
+.stat-spec-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-spec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 13.5px;
+}
+
+.stat-spec-label {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.stat-spec-val {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* Slide-over Drawers & Clean Modals */
 .overlay-backdrop {
   position: fixed;
