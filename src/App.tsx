@@ -53,6 +53,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSavedDrawer, setShowSavedDrawer] = useState(false);
 
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+
   const [filters, setFilters] = useState<BuilderFilters>({
     archetypeId: 'stellar-conduct',
     encounterId: null,
@@ -153,11 +155,61 @@ export default function App() {
     return recommendations[0] ?? null;
   }, [manualTeam, selectedRecId, recommendations]);
 
+  const activeRegionPreset = useMemo(
+    () => presets.find((p) => p.id === selectedRegionId) ?? null,
+    [presets, selectedRegionId]
+  );
+
   const handleChangeFilters = (next: BuilderFilters) => {
+    setSelectedRegionId(null);
     setFilters(next);
     setManualTeam(null);
     setSelectedRecId(null);
     setGeminiError(null);
+  };
+
+  const loadPresetIntoCircle = (
+    preset: RegionalPreset,
+    resolvedMembers?: Character[]
+  ) => {
+    const charMap = new Map(roster.map((c) => [c.id, c]));
+    const members =
+      resolvedMembers ??
+      preset.resolvedCharacterIds
+        .map((id) => (id ? charMap.get(id) ?? null : null))
+        .filter((c): c is Character => Boolean(c));
+
+    if (members.length < 4) return;
+    const tuple = members.slice(0, 4) as [
+      Character,
+      Character,
+      Character,
+      Character,
+    ];
+    const analysis = analyzeTeam(tuple);
+    setSelectedRegionId(preset.id);
+    setManualTeam({
+      id: `preset-${preset.id}`,
+      title: preset.teamName,
+      subtitle: preset.region,
+      members: tuple,
+      slotLabels: inferSlotRoles(tuple),
+      analysis,
+      whyItWorks: `Your go-to "${preset.region}" squad from Party by Region. Hover any connection inside the circle to inspect reactions, or click a portrait to test substitutes.`,
+      source: 'preset',
+    });
+  };
+
+  const handleSelectRegionDropdown = (presetId: string | null) => {
+    if (!presetId) {
+      setSelectedRegionId(null);
+      setManualTeam(null);
+      return;
+    }
+    const preset = presets.find((p) => p.id === presetId);
+    if (preset) {
+      loadPresetIntoCircle(preset);
+    }
   };
 
   const handleSwapSlot = (slotIndex: number, nextChar: Character) => {
@@ -198,6 +250,7 @@ export default function App() {
         filters.includeUnbuilt,
         filters.requireSurvivability
       );
+      setSelectedRegionId(null);
       setManualTeam(rec);
       notify(`Genshin Guru assembled "${rec.title}".`);
     } catch (err) {
@@ -214,7 +267,7 @@ export default function App() {
       id: `saved-${Date.now()}`,
       name: team.title,
       notes: team.whyItWorks,
-      regionTag: team.archetypeId ? team.archetypeId : 'Custom',
+      regionTag: activeRegionPreset?.region || team.archetypeId || 'Custom',
       memberIds: team.members.map((m) => m.id) as [
         string,
         string,
@@ -289,24 +342,7 @@ export default function App() {
     preset: RegionalPreset,
     members: Character[]
   ) => {
-    if (members.length < 4) return;
-    const tuple = members.slice(0, 4) as [
-      Character,
-      Character,
-      Character,
-      Character,
-    ];
-    const analysis = analyzeTeam(tuple);
-    setManualTeam({
-      id: `preset-${preset.id}`,
-      title: preset.teamName,
-      subtitle: preset.region,
-      members: tuple,
-      slotLabels: inferSlotRoles(tuple),
-      analysis,
-      whyItWorks: `Loaded from your "${preset.region}" preset in Party by Region. Hover any connection inside the circle to inspect reactions, or click a portrait to swap.`,
-      source: 'preset',
-    });
+    loadPresetIntoCircle(preset, members);
     setActiveTab('visualizer');
   };
 
@@ -341,6 +377,9 @@ export default function App() {
           <>
             <FilterPanel
               roster={roster}
+              presets={presets}
+              selectedRegionId={selectedRegionId}
+              onSelectRegion={handleSelectRegionDropdown}
               filters={filters}
               onChangeFilters={handleChangeFilters}
               hasGeminiKey={Boolean(settings.geminiApiKey)}
@@ -353,7 +392,9 @@ export default function App() {
             <TeamVisualizer
               recommendations={recommendations}
               activeTeam={activeTeam}
+              activeRegionName={activeRegionPreset?.region ?? null}
               onSelectRecommendation={(rec) => {
+                setSelectedRegionId(null);
                 setManualTeam(null);
                 setSelectedRecId(rec.id);
               }}
@@ -365,7 +406,7 @@ export default function App() {
                 void handleCopySheetRow(
                   t.members,
                   t.title,
-                  t.archetypeId || 'Custom'
+                  activeRegionPreset?.region || t.archetypeId || 'Custom'
                 )
               }
               onSendToAbyss={(t, half) =>
@@ -449,6 +490,7 @@ export default function App() {
               Character,
             ];
             const analysis = analyzeTeam(tuple);
+            setSelectedRegionId(null);
             setManualTeam({
               id: saved.id,
               title: saved.name,

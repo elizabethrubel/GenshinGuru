@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowUpRight,
   Bookmark,
   ClipboardCopy,
   Sparkles,
   Swords,
 } from 'lucide-react';
 import type { Character, TeamRecommendation } from '../types/genshin';
+import { getContextualBuildCallouts } from '../engine/buildPriorities';
 import { CharacterPortrait } from './CharacterPortrait';
 import { SlotSwapDrawer } from './SlotSwapDrawer';
 import { getEdgeColor, TeamCircle } from './TeamCircle';
@@ -14,6 +16,7 @@ import { getEdgeColor, TeamCircle } from './TeamCircle';
 interface TeamVisualizerProps {
   recommendations: TeamRecommendation[];
   activeTeam: TeamRecommendation | null;
+  activeRegionName?: string | null;
   onSelectRecommendation: (rec: TeamRecommendation) => void;
   onSwapSlot: (slotIndex: number, nextChar: Character) => void;
   roster: Character[];
@@ -26,6 +29,7 @@ interface TeamVisualizerProps {
 export function TeamVisualizer({
   recommendations,
   activeTeam,
+  activeRegionName,
   onSelectRecommendation,
   onSwapSlot,
   roster,
@@ -36,6 +40,14 @@ export function TeamVisualizer({
 }: TeamVisualizerProps) {
   const [swappingSlot, setSwappingSlot] = useState<number | null>(null);
   const [activeEdgeIdx, setActiveEdgeIdx] = useState<number | null>(null);
+
+  const buildCallouts = useMemo(() => {
+    if (!activeTeam) return [];
+    return getContextualBuildCallouts(activeTeam.members, roster, {
+      archetypeId: activeTeam.archetypeId,
+      regionName: activeRegionName ?? activeTeam.subtitle,
+    });
+  }, [activeTeam, roster, activeRegionName]);
 
   if (!activeTeam) {
     return (
@@ -82,7 +94,7 @@ export function TeamVisualizer({
           />
 
           {/* Compact Portrait-Cluster Switcher for Alternative Teams */}
-          {recommendations.length > 1 && (
+          {recommendations.length > 1 && !activeRegionName && (
             <div
               className="alt-teams-bar"
               role="list"
@@ -123,6 +135,11 @@ export function TeamVisualizer({
         {/* Right: Calm, Borderless Editorial Readout */}
         <section className="editorial-panel" aria-label="Team breakdown">
           <div>
+            {activeRegionName && (
+              <div className="section-kicker" style={{ color: 'var(--gold)', marginBottom: 4 }}>
+                {activeRegionName}
+              </div>
+            )}
             <h2 className="editorial-title">{activeTeam.title}</h2>
             <div className="meta-line">
               <span style={{ color: 'var(--gold-bright)', fontWeight: 600 }}>
@@ -223,33 +240,57 @@ export function TeamVisualizer({
             )}
           </div>
 
-          {/* Worth Leveling / Warnings (portrait-led, no boxes) */}
-          {(analysis.levelingCallouts.length > 0 ||
-            analysis.warnings.length > 0) && (
+          {/* Contextual "Worth Building Up" callouts — shown even in Lv 70+ mode! */}
+          {(buildCallouts.length > 0 || analysis.warnings.length > 0) && (
             <>
               <hr className="hairline" />
               <div>
-                {analysis.levelingCallouts.map((call) => {
-                  const charObj = members.find(
-                    (m) => m.id === call.characterId
-                  );
-                  return (
-                    <div key={call.characterId} className="note-line warn">
-                      {charObj && (
-                        <CharacterPortrait character={charObj} size={34} />
-                      )}
+                {buildCallouts.length > 0 && (
+                  <h3
+                    className="section-kicker"
+                    style={{ color: 'var(--warn)', marginBottom: 6 }}
+                  >
+                    Beneficial to Build Up
+                  </h3>
+                )}
+
+                {buildCallouts.map((call) => (
+                  <div
+                    key={call.character.id}
+                    className="note-line warn"
+                    style={{ justifyContent: 'space-between' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      <CharacterPortrait character={call.character} size={38} />
                       <div>
-                        <strong>
-                          Worth Leveling: {call.characterName} (Lv{' '}
-                          {call.currentLevel})
-                        </strong>
-                        <div style={{ fontSize: 12.5, opacity: 0.9 }}>
+                        <div>
+                          <strong>{call.character.name}</strong>{' '}
+                          <span style={{ fontSize: 12, opacity: 0.8 }}>
+                            (Lv {call.character.level} · {call.character.element})
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12.5, opacity: 0.88 }}>
                           {call.reason}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+
+                    {!call.inTeamAlready && (
+                      <button
+                        type="button"
+                        className="ghost-action accent"
+                        style={{ flexShrink: 0, fontSize: 12 }}
+                        onClick={() =>
+                          onSwapSlot(call.suggestedSlotIndex, call.character)
+                        }
+                        title={`Preview ${call.character.name} in this Team Circle`}
+                      >
+                        Try in Circle
+                        <ArrowUpRight size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
 
                 {analysis.warnings.map((w, i) => (
                   <div key={i} className="note-line danger">

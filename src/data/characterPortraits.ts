@@ -1,55 +1,21 @@
+import { PORTRAIT_DATA_URIS } from './portraitDataUris';
+
 export interface PortraitAsset {
   url: string;
   objectPosition?: string;
 }
 
-const PORTRAIT_IDS = [
-  'traveller',
-  'fischl',
-  'bennett',
-  'zibai',
-  'flins',
-  'lauma',
-  'kaeya',
-  'lisa',
-  'barbara',
-  'xiangling',
-  'yumemizuki-mizuki',
-  'noelle',
-  'sucrose',
-  'aino',
-  'dehya',
-  'candace',
-  'jahoda',
-  'kaveh',
-  'kachina',
-  'lan-yan',
-  'amber',
-  'collei',
-  'lynette',
-  'baizhu',
-  'mona',
-  'prune',
-  'diona',
-  'alyosha',
-  'kujou-sara',
-  'yaoyao',
-  'gaming',
-  'chevreuse',
-  'thoma',
-  'xinyan',
-] as const;
-
 /**
- * Local character icons sourced from https://genshin-impact.fandom.com/wiki/Character/List
- * and bundled in public/portraits/ so they load instantaneously with zero external blocking.
+ * Inlined 144x144 optimized WebP icons sourced from
+ * https://genshin-impact.fandom.com/wiki/Character/List
+ * Eliminates 34 separate network requests for zero-latency portrait rendering.
  */
 export const CHARACTER_PORTRAITS: Record<string, PortraitAsset> =
   Object.fromEntries(
-    PORTRAIT_IDS.map((id) => [
+    Object.entries(PORTRAIT_DATA_URIS).map(([id, dataUri]) => [
       id,
       {
-        url: `/portraits/${id}.webp`,
+        url: dataUri,
         objectPosition: 'center center',
       },
     ])

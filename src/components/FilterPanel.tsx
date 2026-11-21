@@ -7,11 +7,18 @@ import {
 } from 'lucide-react';
 import { ARCHETYPES } from '../data/archetypes';
 import { ENCOUNTERS } from '../data/encounters';
-import type { BuilderFilters, Character } from '../types/genshin';
+import type {
+  BuilderFilters,
+  Character,
+  RegionalPreset,
+} from '../types/genshin';
 import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
 
 interface FilterPanelProps {
   roster: Character[];
+  presets: RegionalPreset[];
+  selectedRegionId: string | null;
+  onSelectRegion: (presetId: string | null) => void;
   filters: BuilderFilters;
   onChangeFilters: (next: BuilderFilters) => void;
   hasGeminiKey: boolean;
@@ -23,6 +30,9 @@ interface FilterPanelProps {
 
 export function FilterPanel({
   roster,
+  presets,
+  selectedRegionId,
+  onSelectRegion,
   filters,
   onChangeFilters,
   hasGeminiKey,
@@ -61,6 +71,18 @@ export function FilterPanel({
     const q = queryText.trim().toLowerCase();
     if (!q) return;
 
+    // 1. Check direct region preset match first (e.g., "Snezhnaya", "Dragonspine", "Enkanomiya")
+    const matchedPreset = presets.find(
+      (p) =>
+        p.region.toLowerCase().includes(q) ||
+        q.includes(p.region.split('(')[0].trim().toLowerCase())
+    );
+    if (matchedPreset) {
+      onSelectRegion(matchedPreset.id);
+      return;
+    }
+
+    // 2. Match archetype, encounter, or character locally
     const matchedArchetype = ARCHETYPES.find(
       (a) =>
         q.includes(a.name.toLowerCase()) ||
@@ -104,6 +126,7 @@ export function FilterPanel({
   };
 
   const hasActiveFilters =
+    Boolean(selectedRegionId) ||
     Boolean(filters.archetypeId) ||
     Boolean(filters.encounterId) ||
     Boolean(filters.anchorCharacterId);
@@ -122,15 +145,33 @@ export function FilterPanel({
             className="command-input"
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
-            placeholder="Ask or filter — e.g. Stellar-Conduct, Tenebrous Mimic, Flins…"
+            placeholder="Search region, reaction, or boss — e.g. Snezhnaya, Stellar-Conduct…"
           />
         </div>
+
+        {/* Region Dropdown -> Immediately loads that region's team into the Team Circle */}
+        <select
+          id="region-select"
+          aria-label="Select Region Team"
+          className={`inline-select ${selectedRegionId ? 'active-filter' : ''}`}
+          value={selectedRegionId ?? ''}
+          onChange={(e) => onSelectRegion(e.target.value || null)}
+        >
+          <option value="">Region Preset…</option>
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.region}
+            </option>
+          ))}
+        </select>
 
         <select
           id="archetype-select"
           aria-label="Reaction or Mechanic Style"
-          className={`inline-select ${filters.archetypeId ? 'active-filter' : ''}`}
-          value={filters.archetypeId ?? ''}
+          className={`inline-select ${
+            !selectedRegionId && filters.archetypeId ? 'active-filter' : ''
+          }`}
+          value={selectedRegionId ? '' : filters.archetypeId ?? ''}
           onChange={(e) => {
             const nextId = e.target.value || null;
             const needsUnbuilt =
@@ -144,7 +185,7 @@ export function FilterPanel({
             });
           }}
         >
-          <option value="">Any Reaction Style</option>
+          <option value="">Reaction Style…</option>
           {ARCHETYPES.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
@@ -155,8 +196,10 @@ export function FilterPanel({
         <select
           id="encounter-select"
           aria-label="Boss or Encounter Counter"
-          className={`inline-select ${filters.encounterId ? 'active-filter' : ''}`}
-          value={filters.encounterId ?? ''}
+          className={`inline-select ${
+            !selectedRegionId && filters.encounterId ? 'active-filter' : ''
+          }`}
+          value={selectedRegionId ? '' : filters.encounterId ?? ''}
           onChange={(e) =>
             onChangeFilters({
               ...filters,
@@ -164,7 +207,7 @@ export function FilterPanel({
             })
           }
         >
-          <option value="">Any Encounter</option>
+          <option value="">Encounter…</option>
           {ENCOUNTERS.map((enc) => (
             <option key={enc.id} value={enc.id}>
               {enc.name.split('/')[0].trim()}
@@ -175,8 +218,10 @@ export function FilterPanel({
         <select
           id="anchor-select"
           aria-label="Anchor Character"
-          className={`inline-select ${filters.anchorCharacterId ? 'active-filter' : ''}`}
-          value={filters.anchorCharacterId ?? ''}
+          className={`inline-select ${
+            !selectedRegionId && filters.anchorCharacterId ? 'active-filter' : ''
+          }`}
+          value={selectedRegionId ? '' : filters.anchorCharacterId ?? ''}
           onChange={(e) => {
             const nextId = e.target.value || null;
             const chosen = roster.find((c) => c.id === nextId);
@@ -220,7 +265,7 @@ export function FilterPanel({
                   <div className="option-title">Include Unbuilt (Lv 1–69)</div>
                   <div className="option-sub">
                     {filters.includeUnbuilt
-                      ? `All ${roster.length} chars · flags Worth Leveling`
+                      ? `All ${roster.length} chars included`
                       : `Battle-Ready only (${readyCount} chars)`}
                   </div>
                 </div>
@@ -309,6 +354,7 @@ export function FilterPanel({
             className="ghost-action"
             onClick={() => {
               setQueryText('');
+              onSelectRegion(null);
               onChangeFilters({
                 ...filters,
                 archetypeId: null,
