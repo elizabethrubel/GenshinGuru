@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowUpRight, Search, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, RefreshCw, Search, TrendingUp } from 'lucide-react';
 import type { Character, ElementType } from '../types/genshin';
 import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
 import { getRosterBuildPriorities } from '../engine/buildPriorities';
@@ -8,6 +8,9 @@ import { ElementIcon } from './ElementIcon';
 
 interface RosterViewProps {
   roster: Character[];
+  isSyncing: boolean;
+  lastSyncedAt: string | null;
+  onRefreshRoster: () => void;
   onBuildAroundCharacter: (char: Character) => void;
 }
 
@@ -23,6 +26,9 @@ const ELEMENTS: ElementType[] = [
 
 export function RosterView({
   roster,
+  isSyncing,
+  lastSyncedAt,
+  onRefreshRoster,
   onBuildAroundCharacter,
 }: RosterViewProps) {
   const [search, setSearch] = useState('');
@@ -93,6 +99,17 @@ export function RosterView({
                 new synergies with your built roster.
               </p>
             </div>
+
+            <button
+              id="btn-roster-refresh"
+              type="button"
+              className="btn-primary"
+              disabled={isSyncing}
+              onClick={onRefreshRoster}
+            >
+              <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
+              {isSyncing ? 'Refreshing from Sheet…' : 'Refresh from Spreadsheet'}
+            </button>
           </div>
 
           <div className="focus-build-list">
@@ -169,7 +186,11 @@ export function RosterView({
           </h2>
           <p className="editorial-prose" style={{ marginTop: 4 }}>
             {readyCount} Battle-Ready (Lv 70+) · {roster.length - readyCount}{' '}
-            Unbuilt. Click any portrait to build a Team Circle around them.
+            Unbuilt
+            {lastSyncedAt
+              ? ` · Refreshed ${new Date(lastSyncedAt).toLocaleTimeString()}`
+              : ''}
+            . Click any portrait to build a Team Circle around them.
           </p>
         </div>
 

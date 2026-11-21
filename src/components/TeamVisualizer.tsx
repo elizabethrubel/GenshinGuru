@@ -4,10 +4,10 @@ import {
   ArrowUpRight,
   Bookmark,
   ClipboardCopy,
-  Sparkles,
   Swords,
 } from 'lucide-react';
-import type { Character, TeamRecommendation } from '../types/genshin';
+import type { Character, SlotRole, TeamRecommendation } from '../types/genshin';
+import { analyzeTeam, inferSlotRoles } from '../engine/teamAnalyzer';
 import { getContextualBuildCallouts } from '../engine/buildPriorities';
 import { CharacterPortrait } from './CharacterPortrait';
 import { SlotSwapDrawer } from './SlotSwapDrawer';
@@ -16,6 +16,13 @@ import { getEdgeColor, TeamCircle } from './TeamCircle';
 interface TeamVisualizerProps {
   recommendations: TeamRecommendation[];
   activeTeam: TeamRecommendation | null;
+  manualSlots: [
+    Character | null,
+    Character | null,
+    Character | null,
+    Character | null,
+  ];
+  hasActiveSelection: boolean;
   activeRegionName?: string | null;
   onSelectRecommendation: (rec: TeamRecommendation) => void;
   onSwapSlot: (slotIndex: number, nextChar: Character) => void;
@@ -24,11 +31,14 @@ interface TeamVisualizerProps {
   onSaveTeam: (team: TeamRecommendation) => void;
   onCopySheetRow: (team: TeamRecommendation) => void;
   onSendToAbyss: (team: TeamRecommendation, half: 1 | 2) => void;
+  onNavigateTab: (tab: 'regions' | 'roster') => void;
 }
 
 export function TeamVisualizer({
   recommendations,
   activeTeam,
+  manualSlots,
+  hasActiveSelection,
   activeRegionName,
   onSelectRecommendation,
   onSwapSlot,
@@ -37,47 +47,76 @@ export function TeamVisualizer({
   onSaveTeam,
   onCopySheetRow,
   onSendToAbyss,
+  onNavigateTab,
 }: TeamVisualizerProps) {
   const [swappingSlot, setSwappingSlot] = useState<number | null>(null);
   const [activeEdgeIdx, setActiveEdgeIdx] = useState<number | null>(null);
 
+  // Determine the 4 circle slots (either from activeTeam, or partial manualSlots)
+  const circleSlots: (Character | null)[] = activeTeam
+    ? activeTeam.members
+    : manualSlots;
+  const filledMembers = circleSlots.filter((c): c is Character => Boolean(c));
+  const isFullTeam = filledMembers.length === 4;
+
+  const liveAnalysis = useMemo(() => {
+    if (activeTeam) return activeTeam.analysis;
+    return analyzeTeam(filledMembers);
+  }, [activeTeam, filledMembers]);
+
+  const slotLabels: SlotRole[] | undefined = useMemo(() => {
+    if (activeTeam) return activeTeam.slotLabels;
+    if (isFullTeam) {
+      return inferSlotRoles(
+        filledMembers as [Character, Character, Character, Character]
+      );
+    }
+    return undefined;
+  }, [activeTeam, isFullTeam, filledMembers]);
+
   const buildCallouts = useMemo(() => {
-    if (!activeTeam) return [];
-    return getContextualBuildCallouts(activeTeam.members, roster, {
-      archetypeId: activeTeam.archetypeId,
-      regionName: activeRegionName ?? activeTeam.subtitle,
+    if (filledMembers.length === 0) return [];
+    return getContextualBuildCallouts(filledMembers, roster, {
+      archetypeId: activeTeam?.archetypeId,
+      regionName: activeRegionName ?? activeTeam?.subtitle,
     });
-  }, [activeTeam, roster, activeRegionName]);
+  }, [filledMembers, roster, activeTeam, activeRegionName]);
 
-  if (!activeTeam) {
-    return (
-      <div
-        style={{
-          textAlign: 'center',
-          padding: '72px 20px',
-          color: 'var(--text-2)',
-        }}
-      >
-        <Sparkles size={26} color="var(--gold)" />
-        <h2 style={{ margin: '12px 0 6px', fontSize: 18 }}>
-          No Battle-Ready team matches these filters
-        </h2>
-        <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 13.5 }}>
-          Open the level menu in the top bar and enable{' '}
-          <strong>Include Unbuilt (Lv 1–69)</strong> to unlock specialist units
-          like Alyosha, Chevreuse, or Kachina.
-        </p>
-      </div>
-    );
-  }
+  // Empty landing state — zero presets auto-selected!
+  const isEmptyLanding = !hasActiveSelection && filledMembers.length === 0;
+  const isNoFilterMatch = hasActiveSelection && !activeTeam && filledMembers.length === 0;
 
-  const { analysis, members, slotLabels } = activeTeam;
-  const sustainNames = members
+  const sustainNames = filledMembers
     .filter((m) => m.isHealer || m.isShielder)
     .map((m) => m.name)
     .join(' & ');
 
-  const visibleEdges = analysis.edges.slice(0, 6);
+  const visibleEdges = liveAnalysis.edges.slice(0, 6);
+
+  // Construct an exportable team object whenever all 4 slots are populated
+  const effectiveTeam: TeamRecommendation | null = useMemo(() => {
+    if (activeTeam) return activeTeam;
+    if (!isFullTeam) return null;
+    const tuple = filledMembers as [Character, Character, Character, Character];
+    return {
+      id: `manual-${tuple.map((m) => m.id).join('-')}`,
+      title:
+        liveAnalysis.reactions[0]?.name
+          ? `${liveAnalysis.reactions[0].name} Custom Team`
+          : 'Custom Party',
+      subtitle:
+        liveAnalysis.reactions
+          .slice(0, 3)
+          .map((r) => r.name)
+          .join(' · ') || 'Custom Squad',
+      members: tuple,
+      slotLabels: inferSlotRoles(tuple),
+      analysis: liveAnalysis,
+      whyItWorks:
+        'Custom party assembled directly on the Team Circle. Hover any chord to inspect how teammates react.',
+      source: 'custom',
+    };
+  }, [activeTeam, isFullTeam, filledMembers, liveAnalysis]);
 
   return (
     <div>
@@ -85,268 +124,366 @@ export function TeamVisualizer({
         {/* Left: Hero Circular Team Constellation */}
         <div className="circle-column">
           <TeamCircle
-            members={members}
+            members={circleSlots}
             slotLabels={slotLabels}
-            analysis={analysis}
+            analysis={liveAnalysis}
             activeEdgeIndex={activeEdgeIdx}
             onHoverEdge={setActiveEdgeIdx}
             onClickSlot={(idx) => setSwappingSlot(idx)}
           />
 
-          {/* Compact Portrait-Cluster Switcher for Alternative Teams */}
-          {recommendations.length > 1 && !activeRegionName && (
-            <div
-              className="alt-teams-bar"
-              role="list"
-              aria-label="Alternative team suggestions"
-            >
-              {recommendations.slice(0, 4).map((rec, i) => {
-                const isActive = rec.id === activeTeam.id;
-                return (
-                  <button
-                    key={rec.id}
-                    type="button"
-                    className={`alt-team-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveEdgeIdx(null);
-                      onSelectRecommendation(rec);
-                    }}
-                    title={rec.members.map((m) => m.name).join(' · ')}
-                  >
-                    <span className="avatar-stack">
-                      {rec.members.map((m) => (
-                        <CharacterPortrait
-                          key={m.id}
-                          character={m}
-                          size={24}
-                        />
-                      ))}
-                    </span>
-                    <span>
-                      {i === 0 ? 'Top Pick' : `Option ${i + 1}`}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Compact Portrait-Cluster Switcher when engine recommendations are active */}
+          {hasActiveSelection &&
+            recommendations.length > 1 &&
+            !activeRegionName && (
+              <div
+                className="alt-teams-bar"
+                role="list"
+                aria-label="Alternative team suggestions"
+              >
+                {recommendations.slice(0, 4).map((rec, i) => {
+                  const isActive = rec.id === activeTeam?.id;
+                  return (
+                    <button
+                      key={rec.id}
+                      type="button"
+                      className={`alt-team-btn ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveEdgeIdx(null);
+                        onSelectRecommendation(rec);
+                      }}
+                      title={rec.members.map((m) => m.name).join(' · ')}
+                    >
+                      <span className="avatar-stack">
+                        {rec.members.map((m) => (
+                          <CharacterPortrait
+                            key={m.id}
+                            character={m}
+                            size={24}
+                          />
+                        ))}
+                      </span>
+                      <span>
+                        {i === 0 ? 'Top Pick' : `Option ${i + 1}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
         </div>
 
         {/* Right: Calm, Borderless Editorial Readout */}
         <section className="editorial-panel" aria-label="Team breakdown">
-          <div>
-            {activeRegionName && (
-              <div className="section-kicker" style={{ color: 'var(--gold)', marginBottom: 4 }}>
-                {activeRegionName}
-              </div>
-            )}
-            <h2 className="editorial-title">{activeTeam.title}</h2>
-            <div className="meta-line">
-              <span style={{ color: 'var(--gold-bright)', fontWeight: 600 }}>
-                Synergy {analysis.score}
-              </span>
-              {analysis.moonsignTotal > 0 && (
-                <>
-                  <span className="meta-sep">·</span>
-                  <span
-                    style={{
-                      color:
-                        analysis.moonsignTier === 'Ascendant Gleam'
-                          ? 'var(--lunar)'
-                          : 'var(--text-2)',
-                    }}
-                  >
-                    {analysis.moonsignTier} ({analysis.moonsignTotal}/2)
-                  </span>
-                </>
-              )}
-              {analysis.stellarState.includes('Active') && (
-                <>
-                  <span className="meta-sep">·</span>
-                  <span style={{ color: 'var(--stellar)' }}>
-                    {analysis.stellarState.replace(' Active', '')}
-                  </span>
-                </>
-              )}
-              <span className="meta-sep">·</span>
-              <span>
-                {sustainNames ? `Sustain: ${sustainNames}` : 'Glass Cannon'}
-              </span>
-            </div>
-          </div>
-
-          <hr className="hairline" />
-
-          {/* Interactive Reaction Connections */}
-          <div>
-            <h3 className="section-kicker">How They React</h3>
-            <div className="connection-list">
-              {visibleEdges.map((edge, idx) => {
-                const a = members[edge.fromIndex];
-                const b = members[edge.toIndex];
-                const color = getEdgeColor(edge.kind);
-                return (
-                  <button
-                    key={`${edge.fromIndex}-${edge.toIndex}-${edge.label}`}
-                    type="button"
-                    className={`connection-row ${
-                      activeEdgeIdx === idx ? 'active' : ''
-                    }`}
-                    onMouseEnter={() => setActiveEdgeIdx(idx)}
-                    onMouseLeave={() => setActiveEdgeIdx(null)}
-                    onClick={() =>
-                      setActiveEdgeIdx(activeEdgeIdx === idx ? null : idx)
-                    }
-                  >
-                    <span className="connection-left">
-                      <span
-                        className="connection-dot"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="connection-name">{edge.label}</span>
-                    </span>
-                    <span className="connection-pair">
-                      {a?.name} ↔ {b?.name}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {visibleEdges.length === 0 && (
-                <p className="editorial-prose">
-                  Mono-element or raw damage pairing without direct reaction
-                  chords.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <hr className="hairline" />
-
-          {/* Strategy & Resonance */}
-          <div>
-            <h3 className="section-kicker">Why It Works</h3>
-            <p className="editorial-prose">{activeTeam.whyItWorks}</p>
-            {analysis.resonances.length > 0 && (
-              <p
-                className="editorial-prose"
-                style={{ marginTop: 8, color: 'var(--text-3)', fontSize: 12.5 }}
-              >
-                <strong style={{ color: 'var(--text-2)' }}>Resonance:</strong>{' '}
-                {analysis.resonances
-                  .map((r) => `${r.name} (${r.effect})`)
-                  .join(' · ')}
-              </p>
-            )}
-          </div>
-
-          {/* Contextual "Worth Building Up" callouts — shown even in Lv 70+ mode! */}
-          {(buildCallouts.length > 0 || analysis.warnings.length > 0) && (
+          {isEmptyLanding ? (
             <>
-              <hr className="hairline" />
               <div>
-                {buildCallouts.length > 0 && (
-                  <h3
-                    className="section-kicker"
-                    style={{ color: 'var(--warn)', marginBottom: 6 }}
-                  >
-                    Beneficial to Build Up
-                  </h3>
-                )}
+                <div className="section-kicker" style={{ color: 'var(--gold)' }}>
+                  Ready When You Are
+                </div>
+                <h2 className="editorial-title">Visualize Your Next Team</h2>
+                <p className="editorial-prose" style={{ marginTop: 10 }}>
+                  Choose a <strong>Region</strong>, <strong>Reaction Style</strong>,{' '}
+                  <strong>Encounter</strong>, or <strong>Anchor Character</strong>{' '}
+                  from the bar above — or click any of the four slots on the
+                  circle to assemble a squad manually and watch their elemental
+                  connections light up.
+                </p>
+              </div>
 
-                {buildCallouts.map((call) => (
-                  <div
-                    key={call.character.id}
-                    className="note-line warn"
-                    style={{ justifyContent: 'space-between' }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                      <CharacterPortrait character={call.character} size={38} />
-                      <div>
-                        <div>
-                          <strong>{call.character.name}</strong>{' '}
-                          <span style={{ fontSize: 12, opacity: 0.8 }}>
-                            (Lv {call.character.level} · {call.character.element})
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12.5, opacity: 0.88 }}>
-                          {call.reason}
-                        </div>
-                      </div>
-                    </div>
+              <hr className="hairline" />
 
-                    {!call.inTeamAlready && (
-                      <button
-                        type="button"
-                        className="ghost-action accent"
-                        style={{ flexShrink: 0, fontSize: 12 }}
-                        onClick={() =>
-                          onSwapSlot(call.suggestedSlotIndex, call.character)
-                        }
-                        title={`Preview ${call.character.name} in this Team Circle`}
-                      >
-                        Try in Circle
-                        <ArrowUpRight size={12} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                {analysis.warnings.map((w, i) => (
-                  <div key={i} className="note-line danger">
-                    <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-                    <span>{w}</span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn-subtle"
+                  onClick={() => onNavigateTab('regions')}
+                >
+                  Browse Party by Region
+                  <ArrowUpRight size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="btn-subtle"
+                  onClick={() => onNavigateTab('roster')}
+                >
+                  View Roster &amp; Build Priorities
+                  <ArrowUpRight size={13} />
+                </button>
               </div>
             </>
-          )}
+          ) : isNoFilterMatch ? (
+            <div>
+              <h2 className="editorial-title" style={{ fontSize: 22 }}>
+                No Battle-Ready team matches these filters
+              </h2>
+              <p className="editorial-prose" style={{ marginTop: 8 }}>
+                Open the <strong>Lv 70+</strong> menu in the top bar and enable{' '}
+                <strong>Include Unbuilt (Lv 1–69)</strong> to unlock specialist
+                characters like Alyosha, Chevreuse, or Kachina.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                {activeRegionName && (
+                  <div
+                    className="section-kicker"
+                    style={{ color: 'var(--gold)', marginBottom: 4 }}
+                  >
+                    {activeRegionName}
+                  </div>
+                )}
+                <h2 className="editorial-title">
+                  {effectiveTeam?.title ??
+                    `Building Party (${filledMembers.length}/4)`}
+                </h2>
+                <div className="meta-line">
+                  <span style={{ color: 'var(--gold-bright)', fontWeight: 600 }}>
+                    Synergy {liveAnalysis.score}
+                  </span>
+                  {liveAnalysis.moonsignTotal > 0 && (
+                    <>
+                      <span className="meta-sep">·</span>
+                      <span
+                        style={{
+                          color:
+                            liveAnalysis.moonsignTier === 'Ascendant Gleam'
+                              ? 'var(--lunar)'
+                              : 'var(--text-2)',
+                        }}
+                      >
+                        {liveAnalysis.moonsignTier} ({liveAnalysis.moonsignTotal}
+                        /2)
+                      </span>
+                    </>
+                  )}
+                  {liveAnalysis.stellarState.includes('Active') && (
+                    <>
+                      <span className="meta-sep">·</span>
+                      <span style={{ color: 'var(--stellar)' }}>
+                        {liveAnalysis.stellarState.replace(' Active', '')}
+                      </span>
+                    </>
+                  )}
+                  <span className="meta-sep">·</span>
+                  <span>
+                    {sustainNames ? `Sustain: ${sustainNames}` : 'Glass Cannon'}
+                  </span>
+                </div>
+              </div>
 
-          {/* Quiet Action Row */}
-          <div className="editorial-actions">
-            <button
-              id="btn-save-team"
-              type="button"
-              className="btn-primary"
-              onClick={() => onSaveTeam(activeTeam)}
-            >
-              <Bookmark size={13} />
-              Save Team
-            </button>
-            <button
-              id="btn-copy-sheet-row"
-              type="button"
-              className="btn-subtle"
-              onClick={() => onCopySheetRow(activeTeam)}
-            >
-              <ClipboardCopy size={13} />
-              Copy Sheet Row
-            </button>
-            <button
-              type="button"
-              className="ghost-action"
-              onClick={() => onSendToAbyss(activeTeam, 1)}
-            >
-              <Swords size={13} />
-              Abyss 1
-            </button>
-            <button
-              type="button"
-              className="ghost-action"
-              onClick={() => onSendToAbyss(activeTeam, 2)}
-            >
-              <Swords size={13} />
-              Abyss 2
-            </button>
-          </div>
+              <hr className="hairline" />
+
+              {/* Interactive Reaction Connections */}
+              <div>
+                <h3 className="section-kicker">How They React</h3>
+                <div className="connection-list">
+                  {visibleEdges.map((edge, idx) => {
+                    const a = filledMembers[edge.fromIndex];
+                    const b = filledMembers[edge.toIndex];
+                    const color = getEdgeColor(edge.kind);
+                    return (
+                      <button
+                        key={`${edge.fromIndex}-${edge.toIndex}-${edge.label}`}
+                        type="button"
+                        className={`connection-row ${
+                          activeEdgeIdx === idx ? 'active' : ''
+                        }`}
+                        onMouseEnter={() => setActiveEdgeIdx(idx)}
+                        onMouseLeave={() => setActiveEdgeIdx(null)}
+                        onClick={() =>
+                          setActiveEdgeIdx(activeEdgeIdx === idx ? null : idx)
+                        }
+                      >
+                        <span className="connection-left">
+                          <span
+                            className="connection-dot"
+                            style={{ backgroundColor: color }}
+                          />
+                          <span className="connection-name">{edge.label}</span>
+                        </span>
+                        <span className="connection-pair">
+                          {a?.name} ↔ {b?.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {visibleEdges.length === 0 && (
+                    <p className="editorial-prose">
+                      {filledMembers.length < 2
+                        ? 'Add another character on the circle to see elemental reaction chords.'
+                        : 'Mono-element or raw damage pairing without direct reaction chords.'}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {effectiveTeam && (
+                <>
+                  <hr className="hairline" />
+
+                  <div>
+                    <h3 className="section-kicker">Why It Works</h3>
+                    <p className="editorial-prose">
+                      {effectiveTeam.whyItWorks}
+                    </p>
+                    {liveAnalysis.resonances.length > 0 && (
+                      <p
+                        className="editorial-prose"
+                        style={{
+                          marginTop: 8,
+                          color: 'var(--text-3)',
+                          fontSize: 12.5,
+                        }}
+                      >
+                        <strong style={{ color: 'var(--text-2)' }}>
+                          Resonance:
+                        </strong>{' '}
+                        {liveAnalysis.resonances
+                          .map((r) => `${r.name} (${r.effect})`)
+                          .join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Contextual "Beneficial to Build Up" callouts */}
+              {(buildCallouts.length > 0 ||
+                liveAnalysis.warnings.length > 0) && (
+                <>
+                  <hr className="hairline" />
+                  <div>
+                    {buildCallouts.length > 0 && (
+                      <h3
+                        className="section-kicker"
+                        style={{ color: 'var(--warn)', marginBottom: 6 }}
+                      >
+                        Beneficial to Build Up
+                      </h3>
+                    )}
+
+                    {buildCallouts.map((call) => (
+                      <div
+                        key={call.character.id}
+                        className="note-line warn"
+                        style={{ justifyContent: 'space-between' }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            minWidth: 0,
+                          }}
+                        >
+                          <CharacterPortrait
+                            character={call.character}
+                            size={38}
+                          />
+                          <div>
+                            <div>
+                              <strong>{call.character.name}</strong>{' '}
+                              <span style={{ fontSize: 12, opacity: 0.8 }}>
+                                (Lv {call.character.level} ·{' '}
+                                {call.character.element})
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12.5, opacity: 0.88 }}>
+                              {call.reason}
+                            </div>
+                          </div>
+                        </div>
+
+                        {!call.inTeamAlready && (
+                          <button
+                            type="button"
+                            className="ghost-action accent"
+                            style={{ flexShrink: 0, fontSize: 12 }}
+                            onClick={() =>
+                              onSwapSlot(
+                                call.suggestedSlotIndex,
+                                call.character
+                              )
+                            }
+                            title={`Preview ${call.character.name} in this Team Circle`}
+                          >
+                            Try in Circle
+                            <ArrowUpRight size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    {liveAnalysis.warnings.map((w, i) => (
+                      <div key={i} className="note-line danger">
+                        <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+                        <span>{w}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Quiet Action Row when 4 members are placed */}
+              {effectiveTeam && (
+                <div className="editorial-actions">
+                  <button
+                    id="btn-save-team"
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => onSaveTeam(effectiveTeam)}
+                  >
+                    <Bookmark size={13} />
+                    Save Team
+                  </button>
+                  <button
+                    id="btn-copy-sheet-row"
+                    type="button"
+                    className="btn-subtle"
+                    onClick={() => onCopySheetRow(effectiveTeam)}
+                  >
+                    <ClipboardCopy size={13} />
+                    Copy Sheet Row
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-action"
+                    onClick={() => onSendToAbyss(effectiveTeam, 1)}
+                  >
+                    <Swords size={13} />
+                    Abyss 1
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-action"
+                    onClick={() => onSendToAbyss(effectiveTeam, 2)}
+                  >
+                    <Swords size={13} />
+                    Abyss 2
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </section>
       </div>
 
       {swappingSlot !== null && (
         <SlotSwapDrawer
-          title={`Swap ${members[swappingSlot]?.name ?? `Slot ${swappingSlot + 1}`}`}
-          currentMembers={members}
-          slotIndex={swappingSlot}
+          title={
+            circleSlots[swappingSlot]
+              ? `Swap ${circleSlots[swappingSlot]!.name}`
+              : `Add Character to Slot ${swappingSlot + 1}`
+          }
+          currentMembers={filledMembers}
+          slotIndex={(() => {
+            const target = circleSlots[swappingSlot];
+            if (!target) return filledMembers.length;
+            return filledMembers.findIndex((c) => c.id === target.id);
+          })()}
           roster={roster}
           includeUnbuilt={includeUnbuilt}
           onPickCharacter={(nextChar) => onSwapSlot(swappingSlot, nextChar)}

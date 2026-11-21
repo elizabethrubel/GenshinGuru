@@ -23,7 +23,11 @@ import {
   formatTeamAsSheetRow,
   generateRecommendedTeams,
 } from './engine/teamBuilder';
-import { fetchRosterFromSheets } from './services/sheetsApi';
+import {
+  fetchRosterFromSheets,
+  parseCharactersFromRows,
+  parseDelimitedText,
+} from './services/sheetsApi';
 import { askGenshinGuruGemini } from './services/geminiApi';
 import {
   loadSavedAbyssPairs,
@@ -42,6 +46,13 @@ import { RosterView } from './components/RosterView';
 import { SavedTeamsDrawer } from './components/SavedTeamsView';
 import { SettingsModal } from './components/SettingsModal';
 
+const EMPTY_SLOTS: [
+  Character | null,
+  Character | null,
+  Character | null,
+  Character | null,
+] = [null, null, null, null];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('visualizer');
   const [roster, setRoster] = useState<Character[]>(SNAPSHOT_CHARACTERS);
@@ -53,10 +64,10 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSavedDrawer, setShowSavedDrawer] = useState(false);
 
+  // Start completely clean on landing — zero presets auto-selected!
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
-
   const [filters, setFilters] = useState<BuilderFilters>({
-    archetypeId: 'stellar-conduct',
+    archetypeId: null,
     encounterId: null,
     anchorCharacterId: null,
     includeUnbuilt: false,
@@ -65,6 +76,10 @@ export default function App() {
   });
 
   const [manualTeam, setManualTeam] = useState<TeamRecommendation | null>(null);
+  const [manualSlots, setManualSlots] =
+    useState<[Character | null, Character | null, Character | null, Character | null]>(
+      EMPTY_SLOTS
+    );
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
 
   const [isAskingGemini, setIsAskingGemini] = useState(false);
@@ -92,7 +107,7 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3000);
+    const t = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(t);
   }, [toast]);
 
@@ -126,25 +141,62 @@ export default function App() {
       setSettings(updated);
       saveSettings(updated);
       if (!silent) {
-        notify(`Synced ${result.characters.length} characters from Google Sheets.`);
+        notify(
+          `Refreshed ${result.characters.length} characters from your Google Sheet.`
+        );
         setShowSettings(false);
       }
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : 'Failed to sync Google Sheet.';
+        err instanceof Error ? err.message : 'Failed to refresh Google Sheet.';
       setSyncError(msg);
       if (!silent) {
-        notify('Google Sheet sync failed — check Settings.');
+        setShowSettings(true);
       }
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const recommendations = useMemo(
-    () => generateRecommendedTeams(roster, filters, 6),
-    [roster, filters]
-  );
+  const handleImportPastedRoster = (rawText: string) => {
+    const rows = parseDelimitedText(rawText);
+    const parsed = parseCharactersFromRows(rows);
+    if (parsed.length === 0) {
+      setSyncError(
+        'Could not parse any characters — include the header row (Character, Level, Type, ...).'
+      );
+      return;
+    }
+    setRoster(parsed);
+    const updated: AppSettings = {
+      ...settings,
+      lastSyncedAt: new Date().toISOString(),
+      dataSource: 'live-sheets',
+    };
+    setSettings(updated);
+    saveSettings(updated);
+    setSyncError(null);
+    setShowSettings(false);
+    notify(`Updated ${parsed.length} characters from pasted spreadsheet rows.`);
+  };
+
+  const hasActiveFilterCriteria =
+    Boolean(selectedRegionId) ||
+    Boolean(filters.archetypeId) ||
+    Boolean(filters.encounterId) ||
+    Boolean(filters.anchorCharacterId) ||
+    Boolean(manualTeam);
+
+  const recommendations = useMemo(() => {
+    if (
+      !filters.archetypeId &&
+      !filters.encounterId &&
+      !filters.anchorCharacterId
+    ) {
+      return [];
+    }
+    return generateRecommendedTeams(roster, filters, 6);
+  }, [roster, filters]);
 
   const activeTeam: TeamRecommendation | null = useMemo(() => {
     if (manualTeam) return manualTeam;
@@ -164,6 +216,7 @@ export default function App() {
     setSelectedRegionId(null);
     setFilters(next);
     setManualTeam(null);
+    setManualSlots(EMPTY_SLOTS);
     setSelectedRecId(null);
     setGeminiError(null);
   };
@@ -188,6 +241,7 @@ export default function App() {
     ];
     const analysis = analyzeTeam(tuple);
     setSelectedRegionId(preset.id);
+    setManualSlots(tuple);
     setManualTeam({
       id: `preset-${preset.id}`,
       title: preset.teamName,
@@ -204,6 +258,7 @@ export default function App() {
     if (!presetId) {
       setSelectedRegionId(null);
       setManualTeam(null);
+      setManualSlots(EMPTY_SLOTS);
       return;
     }
     const preset = presets.find((p) => p.id === presetId);
@@ -213,30 +268,65 @@ export default function App() {
   };
 
   const handleSwapSlot = (slotIndex: number, nextChar: Character) => {
-    if (!activeTeam) return;
-    const nextMembers = [...activeTeam.members] as [
-      Character,
-      Character,
-      Character,
-      Character,
-    ];
-    nextMembers[slotIndex] = nextChar;
-    const nextAnalysis = analyzeTeam(nextMembers);
-    const nextRoles = inferSlotRoles(nextMembers);
+    if (activeTeam) {
+      const nextMembers = [...activeTeam.members] as [
+        Character,
+        Character,
+        Character,
+        Character,
+      ];
+      nextMembers[slotIndex] = nextChar;
+      const nextAnalysis = analyzeTeam(nextMembers);
+      const nextRoles = inferSlotRoles(nextMembers);
 
-    setManualTeam({
-      ...activeTeam,
-      id: `custom-${nextMembers.map((m) => m.id).join('-')}`,
-      members: nextMembers,
-      slotLabels: nextRoles,
-      analysis: nextAnalysis,
-      subtitle:
-        nextAnalysis.reactions
-          .slice(0, 3)
-          .map((r) => r.name)
-          .join(' · ') || 'Custom Squad',
-      source: 'custom',
-    });
+      setManualSlots(nextMembers);
+      setManualTeam({
+        ...activeTeam,
+        id: `custom-${nextMembers.map((m) => m.id).join('-')}`,
+        members: nextMembers,
+        slotLabels: nextRoles,
+        analysis: nextAnalysis,
+        subtitle:
+          nextAnalysis.reactions
+            .slice(0, 3)
+            .map((r) => r.name)
+            .join(' · ') || 'Custom Squad',
+        source: 'custom',
+      });
+      return;
+    }
+
+    // Building manually on the blank landing circle
+    const nextSlots = [...manualSlots] as [
+      Character | null,
+      Character | null,
+      Character | null,
+      Character | null,
+    ];
+    nextSlots[slotIndex] = nextChar;
+    setManualSlots(nextSlots);
+
+    if (nextSlots.every(Boolean)) {
+      const tuple = nextSlots as [Character, Character, Character, Character];
+      const nextAnalysis = analyzeTeam(tuple);
+      setManualTeam({
+        id: `custom-${tuple.map((m) => m.id).join('-')}`,
+        title: nextAnalysis.reactions[0]?.name
+          ? `${nextAnalysis.reactions[0].name} Custom Team`
+          : 'Custom Party',
+        subtitle:
+          nextAnalysis.reactions
+            .slice(0, 3)
+            .map((r) => r.name)
+            .join(' · ') || 'Custom Squad',
+        members: tuple,
+        slotLabels: inferSlotRoles(tuple),
+        analysis: nextAnalysis,
+        whyItWorks:
+          'Custom party assembled directly on the Team Circle. Hover any chord to inspect how teammates react.',
+        source: 'custom',
+      });
+    }
   };
 
   const handleAskGemini = async (question: string) => {
@@ -251,6 +341,7 @@ export default function App() {
         filters.requireSurvivability
       );
       setSelectedRegionId(null);
+      setManualSlots(rec.members);
       setManualTeam(rec);
       notify(`Genshin Guru assembled "${rec.title}".`);
     } catch (err) {
@@ -392,10 +483,13 @@ export default function App() {
             <TeamVisualizer
               recommendations={recommendations}
               activeTeam={activeTeam}
+              manualSlots={manualSlots}
+              hasActiveSelection={hasActiveFilterCriteria}
               activeRegionName={activeRegionPreset?.region ?? null}
               onSelectRecommendation={(rec) => {
                 setSelectedRegionId(null);
                 setManualTeam(null);
+                setManualSlots(rec.members);
                 setSelectedRecId(rec.id);
               }}
               onSwapSlot={handleSwapSlot}
@@ -412,6 +506,7 @@ export default function App() {
               onSendToAbyss={(t, half) =>
                 handleSendToAbyss(t.members, t.title, half)
               }
+              onNavigateTab={(tab) => setActiveTab(tab)}
             />
           </>
         )}
@@ -471,6 +566,9 @@ export default function App() {
         {activeTab === 'roster' && (
           <RosterView
             roster={roster}
+            isSyncing={isSyncing}
+            lastSyncedAt={settings.lastSyncedAt}
+            onRefreshRoster={() => void performLiveSync(settings)}
             onBuildAroundCharacter={handleBuildAroundCharacter}
           />
         )}
@@ -491,6 +589,7 @@ export default function App() {
             ];
             const analysis = analyzeTeam(tuple);
             setSelectedRegionId(null);
+            setManualSlots(tuple);
             setManualTeam({
               id: saved.id,
               title: saved.name,
@@ -544,6 +643,7 @@ export default function App() {
             saveSettings(next);
             notify('Settings saved.');
           }}
+          onImportPastedRoster={handleImportPastedRoster}
           onResetSnapshot={() => {
             setRoster(SNAPSHOT_CHARACTERS);
             setPresets(SNAPSHOT_PRESETS);

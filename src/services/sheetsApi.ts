@@ -99,6 +99,66 @@ export function extractMechanicTags(
   return Array.from(new Set(tags));
 }
 
+export function parseDelimitedText(text: string): string[][] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  // Detect tab-separated paste directly from Google Sheets
+  const firstLine = trimmed.split(/\r?\n/)[0] ?? '';
+  if (firstLine.includes('\t')) {
+    return trimmed
+      .split(/\r?\n/)
+      .map((line) => line.split('\t').map((cell) => cell.trim()));
+  }
+
+  // RFC-4180 CSV parser
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    const next = trimmed[i + 1];
+
+    if (inQuotes) {
+      if (ch === '"' && next === '"') {
+        currentCell += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        currentCell += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      currentRow.push(currentCell.trim());
+      currentCell = '';
+    } else if (ch === '\r' && next === '\n') {
+      currentRow.push(currentCell.trim());
+      rows.push(currentRow);
+      currentRow = [];
+      currentCell = '';
+      i++;
+    } else if (ch === '\n' || ch === '\r') {
+      currentRow.push(currentCell.trim());
+      rows.push(currentRow);
+      currentRow = [];
+      currentCell = '';
+    } else {
+      currentCell += ch;
+    }
+  }
+
+  currentRow.push(currentCell.trim());
+  if (currentRow.some(Boolean)) {
+    rows.push(currentRow);
+  }
+
+  return rows;
+}
+
 export function parseCharactersFromRows(rows: string[][]): Character[] {
   if (!rows || rows.length < 2) return [];
 
@@ -211,11 +271,9 @@ export function resolveSlotToCharacterId(
   const cleaned = slotText.trim();
   if (!cleaned) return null;
 
-  // Handle "Lynette (25) / Lisa (90)" -> pick first candidate, or fall back to second
   const parts = cleaned.split('/').map((p) => p.trim());
 
   for (const part of parts) {
-    // Strip "(90)" or "- Cryo (90)"
     const baseName = part
       .replace(/\(\d+\)/g, '')
       .replace(/-\s*(cryo|electro|pyro|geo|dendro|hydro|anemo)/gi, '')
@@ -225,7 +283,6 @@ export function resolveSlotToCharacterId(
     const exact = characters.find((c) => c.name.toLowerCase() === baseName);
     if (exact) return exact.id;
 
-    // Handle "Traveller" vs "Traveler"
     if (baseName.includes('travel')) {
       const trav = characters.find((c) =>
         c.name.toLowerCase().includes('travel')
@@ -286,64 +343,117 @@ export interface SheetsSyncResult {
   syncedAt: string;
 }
 
+async function fetchGvizCsvTab(
+  spreadsheetId: string,
+  sheetName: string
+): Promise<string[][]> {
+  const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(
+    spreadsheetId
+  )}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const text = await res.text();
+  if (
+    text.trim().toLowerCase().startsWith('<!doctype html') ||
+    text.includes('accounts.google.com')
+  ) {
+    throw new Error('SHEET_PRIVATE');
+  }
+  return parseDelimitedText(text);
+}
+
 export async function fetchRosterFromSheets(
   spreadsheetId: string,
-  apiKey: string
+  apiKey?: string
 ): Promise<SheetsSyncResult> {
   const cleanId = spreadsheetId.trim();
-  const cleanKey = apiKey.trim();
+  const cleanKey = (apiKey ?? '').trim();
 
   if (!cleanId) {
     throw new Error('Please provide a Google Spreadsheet ID.');
   }
-  if (!cleanKey) {
-    throw new Error('Please provide a Google Sheets API v4 key.');
-  }
 
-  const ranges = ['All Characters!A1:J200', 'Party by Region!A1:F100'];
-  const params = new URLSearchParams();
-  for (const r of ranges) {
-    params.append('ranges', r);
-  }
-  params.set('key', cleanKey);
+  // Path 1: Google Sheets API v4 when an API key is configured
+  if (cleanKey) {
+    const ranges = ['All Characters!A1:J200', 'Party by Region!A1:F100'];
+    const params = new URLSearchParams();
+    for (const r of ranges) {
+      params.append('ranges', r);
+    }
+    params.set('key', cleanKey);
 
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
-    cleanId
-  )}/values:batchGet?${params.toString()}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+      cleanId
+    )}/values:batchGet?${params.toString()}`;
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    let detail = `HTTP ${response.status}`;
-    try {
-      const errJson = await response.json();
-      if (errJson?.error?.message) {
-        detail = errJson.error.message;
+    const response = await fetch(url);
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.error?.message) {
+          detail = errJson.error.message;
+        }
+      } catch {
+        // ignore json parse error
       }
+      throw new Error(
+        `Google Sheets API error (${detail}). Make sure your Sheet is link-viewable ("Anyone with the link can view") and your API key has Google Sheets API enabled.`
+      );
+    }
+
+    const data = await response.json();
+    const valueRanges: Array<{ values?: string[][] }> = data.valueRanges ?? [];
+    const charRows = valueRanges[0]?.values ?? [];
+    const presetRows = valueRanges[1]?.values ?? [];
+
+    const characters = parseCharactersFromRows(charRows);
+    if (characters.length === 0) {
+      throw new Error(
+        'Connected to the sheet, but found no characters in the "All Characters" tab.'
+      );
+    }
+
+    const presets = parsePresetsFromRows(presetRows, characters);
+    return {
+      characters,
+      presets,
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  // Path 2: Zero-key public GViz CSV fetch (works immediately when sheet is link-viewable)
+  try {
+    const charRows = await fetchGvizCsvTab(cleanId, 'All Characters');
+    const characters = parseCharactersFromRows(charRows);
+    if (characters.length === 0) {
+      throw new Error('SHEET_PRIVATE');
+    }
+
+    let presets: RegionalPreset[] = [];
+    try {
+      const presetRows = await fetchGvizCsvTab(cleanId, 'Party by Region');
+      presets = parsePresetsFromRows(presetRows, characters);
     } catch {
-      // ignore json parse error
+      // Optional tab
+    }
+
+    return {
+      characters,
+      presets,
+      syncedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    if (err instanceof Error && err.message === 'SHEET_PRIVATE') {
+      throw new Error(
+        'Your Google Sheet is currently private. Set Share → "Anyone with the link can view" for 1-click Refresh, add a Sheets API v4 key, or paste rows directly below.'
+      );
     }
     throw new Error(
-      `Google Sheets API error (${detail}). Make sure your Sheet is link-viewable ("Anyone with the link can view") and your API key has Google Sheets API enabled.`
+      'Could not reach your Google Sheet directly (it may be private). Set sharing to "Anyone with the link can view", add a Sheets API v4 key, or paste your updated rows below.'
     );
   }
-
-  const data = await response.json();
-  const valueRanges: Array<{ values?: string[][] }> = data.valueRanges ?? [];
-  const charRows = valueRanges[0]?.values ?? [];
-  const presetRows = valueRanges[1]?.values ?? [];
-
-  const characters = parseCharactersFromRows(charRows);
-  if (characters.length === 0) {
-    throw new Error(
-      'Connected to the sheet, but found no characters in the "All Characters" tab.'
-    );
-  }
-
-  const presets = parsePresetsFromRows(presetRows, characters);
-
-  return {
-    characters,
-    presets,
-    syncedAt: new Date().toISOString(),
-  };
 }

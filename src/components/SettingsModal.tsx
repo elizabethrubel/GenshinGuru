@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   CheckCircle2,
+  ClipboardPaste,
   ExternalLink,
   RefreshCw,
   RotateCcw,
@@ -15,6 +16,7 @@ interface SettingsModalProps {
   syncError: string | null;
   onSaveAndSync: (nextSettings: AppSettings) => Promise<void>;
   onSaveOnly: (nextSettings: AppSettings) => void;
+  onImportPastedRoster: (rawText: string) => void;
   onResetSnapshot: () => void;
   onClose: () => void;
 }
@@ -25,6 +27,7 @@ export function SettingsModal({
   syncError,
   onSaveAndSync,
   onSaveOnly,
+  onImportPastedRoster,
   onResetSnapshot,
   onClose,
 }: SettingsModalProps) {
@@ -33,6 +36,7 @@ export function SettingsModal({
   );
   const [sheetsApiKey, setSheetsApiKey] = useState(settings.sheetsApiKey);
   const [geminiApiKey, setGeminiApiKey] = useState(settings.geminiApiKey);
+  const [pastedRows, setPastedRows] = useState('');
 
   const buildNextSettings = (): AppSettings => ({
     ...settings,
@@ -54,10 +58,10 @@ export function SettingsModal({
       <div className="modal-panel">
         <div className="drawer-header">
           <div>
-            <h3 className="drawer-title">Sync &amp; API Settings</h3>
+            <h3 className="drawer-title">Spreadsheet Refresh &amp; Settings</h3>
             <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               {settings.dataSource === 'live-sheets' && settings.lastSyncedAt
-                ? `Live synced ${new Date(settings.lastSyncedAt).toLocaleString()}`
+                ? `Last refreshed ${new Date(settings.lastSyncedAt).toLocaleString()}`
                 : 'Using bundled snapshot of your 34 characters & 17 regional teams'}
             </div>
           </div>
@@ -85,7 +89,8 @@ export function SettingsModal({
             />
             <span className="field-help">
               Reads <code>All Characters</code> and <code>Party by Region</code>
-              .{' '}
+              . Set Share → <strong>Anyone with the link can view</strong> for
+              1-click refresh even without an API key.{' '}
               <a
                 href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
                 target="_blank"
@@ -104,7 +109,7 @@ export function SettingsModal({
 
           <div className="field-group">
             <label htmlFor="input-sheets-key" className="field-label">
-              Google Sheets API v4 Key (Read-Only)
+              Google Sheets API v4 Key (Optional — Read-Only)
             </label>
             <input
               id="input-sheets-key"
@@ -112,12 +117,11 @@ export function SettingsModal({
               className="field-input"
               value={sheetsApiKey}
               onChange={(e) => setSheetsApiKey(e.target.value)}
-              placeholder="AIzaSy…"
+              placeholder="AIzaSy… (optional if Sheet is link-viewable)"
             />
             <span className="field-help">
               Stored locally in your browser (or via{' '}
-              <code>VITE_GOOGLE_SHEETS_API_KEY</code>). Sheet must be set to
-              &quot;Anyone with the link can view&quot;.
+              <code>VITE_GOOGLE_SHEETS_API_KEY</code>).
             </span>
           </div>
 
@@ -128,11 +132,11 @@ export function SettingsModal({
               id="btn-modal-sync"
               type="button"
               className="btn-primary"
-              disabled={isSyncing || !sheetsApiKey.trim()}
+              disabled={isSyncing}
               onClick={() => onSaveAndSync(buildNextSettings())}
             >
-              <RefreshCw size={13} />
-              {isSyncing ? 'Syncing…' : 'Save & Sync Live Sheet'}
+              <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
+              {isSyncing ? 'Refreshing…' : 'Refresh from Google Sheet Now'}
             </button>
             <button
               type="button"
@@ -140,8 +144,43 @@ export function SettingsModal({
               onClick={onResetSnapshot}
             >
               <RotateCcw size={13} />
-              Use Snapshot
+              Reset Snapshot
             </button>
+          </div>
+
+          <hr className="hairline" />
+
+          {/* Keep Sheet Private? Paste rows directly from Sheets */}
+          <div className="field-group">
+            <label htmlFor="input-paste-roster" className="field-label">
+              Keep Your Sheet Private? Quick Paste Update
+            </label>
+            <textarea
+              id="input-paste-roster"
+              className="field-input"
+              rows={3}
+              value={pastedRows}
+              onChange={(e) => setPastedRows(e.target.value)}
+              placeholder="Select all rows in your 'All Characters' tab (Ctrl/Cmd+A, Ctrl/Cmd+C) and paste here…"
+              style={{ resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span className="field-help">
+                Updates levels, constellations, and newly added characters immediately.
+              </span>
+              <button
+                type="button"
+                className="btn-subtle"
+                disabled={!pastedRows.trim()}
+                onClick={() => {
+                  onImportPastedRoster(pastedRows);
+                  setPastedRows('');
+                }}
+              >
+                <ClipboardPaste size={13} />
+                Apply Pasted Roster
+              </button>
+            </div>
           </div>
 
           <hr className="hairline" />
@@ -158,11 +197,6 @@ export function SettingsModal({
               onChange={(e) => setGeminiApiKey(e.target.value)}
               placeholder="AIzaSy… (optional for freeform boss queries)"
             />
-            <span className="field-help">
-              Lets you type any open-ended &quot;fight xyz&quot; question in the
-              top bar and render Gemini&apos;s pick directly inside the Team
-              Circle.
-            </span>
           </div>
 
           <div

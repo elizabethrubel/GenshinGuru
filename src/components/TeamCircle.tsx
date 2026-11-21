@@ -249,11 +249,16 @@ export function TeamCircle({
             </span>
             <span className="circle-center-desc">{focusedEdge.description}</span>
           </>
+        ) : presentIndices.length === 0 ? (
+          <>
+            <span className="circle-center-state">Open Circle</span>
+            <span className="circle-center-desc">
+              Pick a filter above or tap any + slot
+            </span>
+          </>
         ) : (
           <>
-            <span className="circle-center-score">
-              {presentIndices.length > 0 ? analysis.score : '—'}
-            </span>
+            <span className="circle-center-score">{analysis.score}</span>
             <span className="circle-center-state">{centerBadgeLabel}</span>
             {!compact && (
               <span className="circle-center-desc">

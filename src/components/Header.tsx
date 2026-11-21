@@ -78,6 +78,23 @@ export function Header({
 
         <div className="header-tools">
           <button
+            id="btn-refresh-roster"
+            type="button"
+            className="btn-subtle"
+            disabled={isSyncing}
+            onClick={onSyncNow}
+            title={
+              settings.lastSyncedAt
+                ? `Last refreshed ${new Date(settings.lastSyncedAt).toLocaleTimeString()} — click to re-sync from Google Sheets`
+                : 'Pull latest character levels and teams from your Google Sheet'
+            }
+          >
+            <span className={`sync-dot ${isLive ? 'live' : ''}`} />
+            <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
+            <span>{isSyncing ? 'Refreshing…' : 'Refresh Roster'}</span>
+          </button>
+
+          <button
             id="btn-open-saved"
             type="button"
             className="ghost-action"
@@ -88,28 +105,12 @@ export function Header({
           </button>
 
           <button
-            id="btn-sync-sheet"
-            type="button"
-            className="ghost-action"
-            onClick={settings.sheetsApiKey ? onSyncNow : onOpenSettings}
-            title={
-              settings.sheetsApiKey
-                ? 'Sync latest roster from Google Sheets'
-                : 'Connect Google Sheets API v4'
-            }
-          >
-            <span className={`sync-dot ${isLive ? 'live' : ''}`} />
-            <span>{isSyncing ? 'Syncing…' : isLive ? 'Live' : 'Snapshot'}</span>
-            <RefreshCw size={13} />
-          </button>
-
-          <button
             id="btn-open-settings"
             type="button"
             className="ghost-action"
             onClick={onOpenSettings}
             aria-label="Sync and API settings"
-            title="Sync & API Settings"
+            title="Sheet Sync & API Settings"
           >
             <Settings size={15} />
           </button>
