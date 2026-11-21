@@ -317,6 +317,33 @@ export const CHARACTER_ARTIFACT_GUIDES: Record<string, ArtifactGuide> = {
     substats: 'ER% > DEF% (Shield) or CRIT (DPS)',
     note: 'Use Tenacity + DEF% for utility shielding, or Pale Flame for Physical Burst/Charged Attack builds.',
   },
+  mitya: {
+    primarySet: '4pc Gilded Dreams',
+    alternativeSet: '4pc Disenchantment in Deep Shadow / 4pc Heart of the Furnace',
+    sands: 'EM',
+    goblet: 'EM',
+    circlet: 'CRIT DMG / CRIT Rate (or EM off-field)',
+    substats: 'EM (500+ target) > CRIT > ER%',
+    note: 'Scales heavily with Elemental Mastery — reaching 500 EM caps his +14% party Stellar-Conduct base DMG buff while amplifying his Gradient Beacon hits.',
+  },
+  charlotte: {
+    primarySet: '4pc Noblesse Oblige',
+    alternativeSet: '4pc Song of Days Past / 4pc Tenacity of the Millelith',
+    sands: 'ER%',
+    goblet: 'ATK%',
+    circlet: 'Healing Bonus or ATK%',
+    substats: 'ER% (200%+) > ATK% > CRIT Rate (Favonius)',
+    note: 'Massive teamwide ATK-scaling healing plus Arkhe: Pneuma; stack ER% first so her Burst is always ready.',
+  },
+  rosaria: {
+    primarySet: '4pc Emblem of Severed Fate',
+    alternativeSet: '4pc Noblesse Oblige / 4pc Blizzard Strayer',
+    sands: 'ATK% or ER%',
+    goblet: 'Cryo DMG',
+    circlet: 'CRIT Rate',
+    substats: 'CRIT Rate (up to 100%) > ER% > CRIT DMG > ATK%',
+    note: 'Shares up to +15% CRIT Rate with the party based on her own CRIT Rate while dealing strong off-field Cryo Burst damage.',
+  },
 };
 
 export function getArtifactGuide(char: Character): ArtifactGuide {

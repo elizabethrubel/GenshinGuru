@@ -34,15 +34,24 @@ export function getRosterBuildPriorities(
     let pairsWith: string[] = [];
     let score = 20 + (c.rarity === 5 ? 15 : 0) + (c.isHealer ? 10 : 0);
 
-    if (c.id === 'alyosha') {
+    if (c.id === 'mitya') {
       priority = 'Top Priority';
-      headline = 'Stellar-Conduct Healer & Enabler';
+      headline = '5★ Stellar-Conduct DPS & EM Buffer';
       reason =
-        'Purpose-built Electro healer for Cryo Traveller — unlocks pure Stellar-Conduct teams without borrowing Bennett or Noelle.';
-      pairsWith = ['Traveller', 'Fischl', 'Kaeya'].filter((n) =>
-        ready.some((r) => r.name === n)
+        'Your headline 5★ Stellar-Conduct Electro Catalyst — converts Superconduct into Stellar-Conduct, buffs team Stellar Base DMG by +14% at 500 EM, and pairs directly with Cryo Traveller & Alyosha.';
+      pairsWith = ['Traveller', 'Alyosha', 'Fischl', 'Kaeya'].filter((n) =>
+        roster.some((r) => r.name === n)
       );
-      score = 100;
+      score = 105;
+    } else if (c.id === 'alyosha') {
+      priority = 'Top Priority';
+      headline = 'Stellar-Conduct Healer & Buffer (Almost Ready!)';
+      reason =
+        `Already Lv ${c.level} — finishing to 70/80 completes your dedicated Stellar-Conduct healer & +20% Stellar-Conduct DMG buffer for Mitya and Cryo Traveller.`;
+      pairsWith = ['Mitya', 'Traveller', 'Fischl', 'Kaeya'].filter((n) =>
+        roster.some((r) => r.name === n)
+      );
+      score = 102;
     } else if (c.id === 'chevreuse') {
       priority = 'Top Priority';
       headline = 'Overloaded RES Shred (-40%)';
@@ -51,7 +60,7 @@ export function getRosterBuildPriorities(
       pairsWith = ['Flins', 'Fischl', 'Bennett', 'Xiangling'].filter((n) =>
         ready.some((r) => r.name === n)
       );
-      score = 96;
+      score = 94;
     } else if (c.id === 'baizhu') {
       priority = 'Top Priority';
       headline = '5★ Dendro Healer & Reaction Buffer';
@@ -60,7 +69,16 @@ export function getRosterBuildPriorities(
       pairsWith = ['Lauma', 'Aino', 'Fischl'].filter((n) =>
         ready.some((r) => r.name === n)
       );
-      score = 94;
+      score = 92;
+    } else if (c.id === 'rosaria') {
+      priority = 'High Value';
+      headline = 'Off-Field Cryo & +15% CRIT Rate Buffer';
+      reason =
+        'Provides steady off-field Cryo application for Mitya / Cryo Traveller Stellar-Conduct and Melt teams while sharing up to +15% CRIT Rate.';
+      pairsWith = ['Mitya', 'Traveller', 'Xiangling', 'Bennett'].filter((n) =>
+        roster.some((r) => r.name === n)
+      );
+      score = 86;
     } else if (c.id === 'mona') {
       priority = 'High Value';
       headline = '5★ Hydro Omen Flex';
@@ -69,7 +87,7 @@ export function getRosterBuildPriorities(
       pairsWith = ['Flins', 'Lauma', 'Zibai'].filter((n) =>
         ready.some((r) => r.name === n)
       );
-      score = 84;
+      score = 83;
     } else if (c.id === 'kachina') {
       priority = 'High Value';
       headline = 'Nightsoul & Geo Resonance';
@@ -79,22 +97,31 @@ export function getRosterBuildPriorities(
         ready.some((r) => r.name === n)
       );
       score = 80;
+    } else if (c.id === 'charlotte') {
+      priority = 'High Value';
+      headline = 'Teamwide Cryo Healer & Arkhe: Pneuma';
+      reason =
+        'Strong teamwide healing + Cryo Resonance for Mitya / Cryo Traveller teams, plus Fontaine Pneuma alignment.';
+      pairsWith = ['Mitya', 'Traveller', 'Flins'].filter((n) =>
+        roster.some((r) => r.name === n)
+      );
+      score = 76;
     } else if (c.id === 'diona') {
       priority = 'High Value';
       headline = 'Cryo Shield, Healer & Battery';
       reason =
         'Generates Cryo particles for Cryo Traveller while activating Cryo Resonance (+15% CRIT Rate) and protective shields.';
-      pairsWith = ['Traveller', 'Fischl', 'Kaeya'].filter((n) =>
-        ready.some((r) => r.name === n)
+      pairsWith = ['Traveller', 'Mitya', 'Fischl'].filter((n) =>
+        roster.some((r) => r.name === n)
       );
-      score = 74;
+      score = 72;
     } else if (c.id === 'lan-yan') {
       priority = 'High Value';
       headline = 'Anemo Elemental Absorption Shield';
       reason =
-        'Combines Viridescent Venerer shred with a sturdy elemental shield for comfortable Flins or Cryo Traveller rotations.';
-      pairsWith = ['Flins', 'Traveller', 'Fischl'].filter((n) =>
-        ready.some((r) => r.name === n)
+        'Combines Viridescent Venerer shred with a sturdy elemental shield for comfortable Flins, Mitya, or Cryo Traveller rotations.';
+      pairsWith = ['Flins', 'Mitya', 'Traveller'].filter((n) =>
+        roster.some((r) => r.name === n)
       );
       score = 70;
     } else if (c.id === 'lynette') {
@@ -143,19 +170,15 @@ function pickBestSlotToReplace(
   members: Character[],
   candidate: Character
 ): number {
-  // Prefer replacing an existing healer/shielder if candidate is a healer/shielder
   if (candidate.isHealer || candidate.isShielder) {
     const sustainIdx = members.findIndex((m) => m.isHealer || m.isShielder);
     if (sustainIdx !== -1) return sustainIdx;
   }
-  // Prefer replacing a same-element support/utility unit
   const sameElSupport = members.findIndex(
     (m, i) => i > 0 && m.element === candidate.element
   );
   if (sameElSupport !== -1) return sameElSupport;
-
-  // Otherwise replace slot 3 (index 2, Utility) or slot 4 (index 3)
-  return members.length >= 4 ? 2 : members.length - 1;
+  return members.length >= 4 ? 2 : Math.max(0, members.length - 1);
 }
 
 export function getContextualBuildCallouts(
@@ -194,7 +217,7 @@ export function getContextualBuildCallouts(
   // First include any unbuilt characters already in the circle
   for (const m of members) {
     if (m.level < BATTLE_READY_LEVEL) {
-      const priorityMatch = getRosterBuildPriorities(roster, 12).find(
+      const priorityMatch = getRosterBuildPriorities(roster, 15).find(
         (p) => p.character.id === m.id
       );
       addIfUnbuilt(
@@ -206,6 +229,7 @@ export function getContextualBuildCallouts(
   }
 
   const hasTraveller = memberIds.has('traveller');
+  const hasMitya = memberIds.has('mitya');
   const hasLauma = memberIds.has('lauma');
   const hasZibai = memberIds.has('zibai');
   const hasFlins = memberIds.has('flins');
@@ -215,15 +239,23 @@ export function getContextualBuildCallouts(
   const hasCryo = members.some((m) => m.element === 'Cryo');
   const regionLower = (context?.regionName ?? '').toLowerCase();
 
-  // Contextual beneficial unbuilt characters NOT yet in this circle
   if (
     hasTraveller ||
+    hasMitya ||
     context?.archetypeId === 'stellar-conduct' ||
     regionLower.includes('snezhnaya')
   ) {
     addIfUnbuilt(
+      'mitya',
+      '5★ Stellar-Conduct Catalyst — buffs party Stellar Base DMG by +14% and turns Superconduct into massive Gradient Beacon bursts.'
+    );
+    addIfUnbuilt(
       'alyosha',
-      'Dedicated Stellar-Conduct healer & Electro support — huge upgrade for Cryo Traveller.'
+      'Already Lv 57! Dedicated Stellar-Conduct healer & +20% DMG buffer for Cryo Traveller and Mitya.'
+    );
+    addIfUnbuilt(
+      'rosaria',
+      'Off-field Cryo Sub-DPS sharing up to +15% CRIT Rate + Cryo Resonance.'
     );
   }
 
@@ -268,6 +300,10 @@ export function getContextualBuildCallouts(
       'lynette',
       'Brings Arkhe: Ousia alignment to stun Fontaine Clockwork Meka and bosses.'
     );
+    addIfUnbuilt(
+      'charlotte',
+      'Brings Arkhe: Pneuma + teamwide Cryo healing for Fontaine encounters.'
+    );
   }
 
   if ((hasFlins || hasLauma || hasZibai) && hasHydro) {
@@ -277,10 +313,10 @@ export function getContextualBuildCallouts(
     );
   }
 
-  if (hasCryo && !memberIds.has('diona')) {
+  if (hasCryo && !memberIds.has('rosaria') && !memberIds.has('charlotte')) {
     addIfUnbuilt(
-      'diona',
-      'Cryo shielder, healer & battery — grants Cryo Resonance (+15% CRIT Rate).'
+      'rosaria',
+      'Off-field Cryo sub-DPS granting +15% CRIT Rate share + Cryo Resonance.'
     );
   }
 

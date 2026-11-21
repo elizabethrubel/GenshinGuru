@@ -48,19 +48,24 @@ export function inferSlotRoles(
   const roles: SlotRole[] = ['Utility', 'Utility', 'Utility', 'Utility'];
   const assigned = new Set<number>();
 
-  // 1. Pick Main DPS (prefer dedicated On-Field DPS / Driver over hybrid healers)
+  // 1. Pick Main DPS (prefer dedicated On-Field DPS / Stellar-Conduct or Lunar carries over hybrid healers)
   let dpsIdx = -1;
   let bestDpsScore = -1;
   members.forEach((c, i) => {
     let s = 0;
     const roleLower = c.role.toLowerCase();
-    if (roleLower.includes('on-field dps') && !c.isHealer) s += 60;
-    else if (c.isOnField && !c.isHealer) s += 46;
+    if (roleLower.includes('on-field dps') && !c.isHealer) s += 62;
+    else if (c.isOnField && !c.isHealer) s += 48;
     else if (roleLower.includes('on-field dps')) s += 26;
     else if (c.isOnField) s += 22;
     if (c.rarity === 5) s += 10;
-    if (c.mechanicTags.includes('stellar-conduct') || c.mechanicTags.includes('lunar-charged') || c.mechanicTags.includes('lunar-crystallize')) {
-      s += 12;
+    if (
+      c.id === 'mitya' ||
+      c.id === 'flins' ||
+      c.id === 'zibai' ||
+      c.id === 'traveller'
+    ) {
+      s += 14;
     }
     s += c.level * 0.2;
     if (s > bestDpsScore) {
@@ -107,13 +112,287 @@ export function inferSlotRoles(
     assigned.add(subIdx);
   }
 
-  // 4. Remaining slot(s) stay Utility (or Sub-DPS if none assigned)
+  // 4. Remaining slot(s)
   members.forEach((_c, i) => {
     if (assigned.has(i)) return;
     roles[i] = !roles.includes('Sub-DPS') ? 'Sub-DPS' : 'Utility';
   });
 
   return roles as [SlotRole, SlotRole, SlotRole, SlotRole];
+}
+
+export function computeRawTeamPower(
+  valid: Character[],
+  meta: {
+    lunarChargedActive: boolean;
+    lunarBloomActive: boolean;
+    lunarCrystallizeActive: boolean;
+    moonsignTier: TeamAnalysis['moonsignTier'];
+    stellarState: TeamAnalysis['stellarState'];
+    chevreuseValid: boolean | null;
+    survivability: TeamAnalysis['survivability'];
+    healerCount: number;
+    reactions: ReactionSummary[];
+    resonances: ResonanceInfo[];
+  }
+): number {
+  if (valid.length === 0) return 0;
+
+  const ids = new Set(valid.map((c) => c.id));
+  const hasEl = (el: ElementType) => valid.some((c) => c.element === el);
+  const elCount = (el: ElementType) =>
+    valid.filter((c) => c.element === el).length;
+
+  let power = 100;
+
+  // 1. Survivability & sustain efficiency
+  if (meta.survivability === 'Glass Cannon') {
+    power -= 16;
+  } else {
+    power += 12;
+    if (meta.healerCount >= 2) {
+      power -= 9;
+    }
+  }
+
+  // 2. Single Strongest Core Archetype Bonus (NEVER double/triple-dip unrelated mechanics!)
+  const coreScores: number[] = [0];
+
+  if (meta.lunarChargedActive) {
+    let s = 26;
+    if (meta.moonsignTier === 'Ascendant Gleam') s += 20;
+    if (elCount('Electro') >= 2) s += 10; // Fischl Oz battery + Electro Resonance
+    if (hasEl('Anemo')) s += 12; // VV shred (Jahoda / Sucrose)
+    coreScores.push(s);
+  }
+  if (meta.lunarBloomActive) {
+    let s = 26;
+    if (meta.moonsignTier === 'Ascendant Gleam') s += 20;
+    if (meta.reactions.some((r) => r.name === 'Hyperbloom')) s += 14;
+    if (ids.has('baizhu')) s += 12;
+    coreScores.push(s);
+  }
+  if (meta.lunarCrystallizeActive) {
+    let s = 26;
+    if (meta.moonsignTier === 'Ascendant Gleam') s += 20;
+    if (elCount('Geo') >= 2) s += 18; // Geo Resonance is huge for Zibai
+    coreScores.push(s);
+  }
+  if (meta.stellarState === 'Stellar-Conduct Active') {
+    let s = 28;
+    if (ids.has('mitya') && ids.has('traveller')) s += 18; // Mitya + Cryo Traveller dual Stellar Jubilee
+    if (ids.has('alyosha')) s += 16; // Dedicated Stellar-Conduct healer + 20% DMG + Furnace
+    if (hasEl('Anemo')) s += 10; // VV shred
+    if (elCount('Cryo') >= 2) s += 8; // Cryo Resonance +15% CRIT Rate
+    if (elCount('Electro') >= 2) s += 8; // Electro Resonance battery
+    coreScores.push(s);
+  }
+  if (meta.stellarState === 'Stellar Swirl Active') {
+    let s = 22;
+    if (ids.has('yumemizuki-mizuki') || ids.has('sucrose')) s += 14;
+    coreScores.push(s);
+  }
+  if (meta.chevreuseValid === true) {
+    let s = 44;
+    if (ids.has('flins') || ids.has('fischl')) s += 10;
+    if (ids.has('bennett') || ids.has('xiangling')) s += 10;
+    coreScores.push(s);
+  }
+  if (
+    meta.reactions.some((r) => r.name === 'Melt') &&
+    ids.has('bennett') &&
+    ids.has('xiangling')
+  ) {
+    let s = 38; // Classic Reverse Melt core
+    if (ids.has('sucrose')) s += 12; // VV + EM share
+    coreScores.push(s);
+  }
+
+  power += Math.max(...coreScores);
+
+  if (meta.chevreuseValid === false) {
+    power -= 42;
+  }
+
+  // 3. Anti-Soup Penalty: penalize cramming unrelated archetype carries together!
+  const hasFlins = ids.has('flins');
+  const hasZibai = ids.has('zibai');
+  const hasLauma = ids.has('lauma');
+  const hasTraveller = ids.has('traveller');
+  const hasMitya = ids.has('mitya');
+
+  if (hasFlins && hasZibai) power -= 34;
+  if (hasFlins && hasTraveller) power -= 30; // Flins wants Hydro Lunar-Charged, not Cryo Traveller
+  if (hasFlins && hasMitya) power -= 26;
+  if (hasZibai && hasTraveller) power -= 30;
+  if (hasZibai && hasLauma) power -= 32; // Dendro & Geo do not react
+  if (hasZibai && hasMitya) power -= 32;
+  if (hasLauma && hasTraveller) power -= 28; // Cryo + Dendro don't react
+  if (hasLauma && hasMitya) power -= 28;
+  // Flins + Lauma works ONLY in Multi-Lunar; otherwise Fischl + Aino + Jahoda is stronger for Flins
+  if (hasFlins && hasLauma) power -= 10;
+
+  // 4. Individual character kit value & anti-clash rules
+  const hasAnyLunar =
+    meta.lunarChargedActive ||
+    meta.lunarBloomActive ||
+    meta.lunarCrystallizeActive;
+  const isStellarTeam = meta.stellarState === 'Stellar-Conduct Active';
+
+  for (const c of valid) {
+    switch (c.id) {
+      case 'flins':
+        if (meta.lunarChargedActive) power += 14;
+        else if (meta.chevreuseValid) power += 14;
+        else power -= 18;
+        break;
+      case 'zibai':
+        if (meta.lunarCrystallizeActive) power += 14;
+        else power -= 20;
+        break;
+      case 'lauma':
+        if (meta.lunarBloomActive) power += 14;
+        else power -= 16;
+        break;
+      case 'mitya':
+        if (isStellarTeam) power += 18;
+        else power -= 22;
+        break;
+      case 'traveller':
+        if (
+          isStellarTeam ||
+          meta.stellarState === 'Stellar Swirl Active' ||
+          meta.reactions.some((r) => r.name === 'Melt')
+        ) {
+          power += 14;
+        } else {
+          power -= 12;
+        }
+        break;
+      case 'alyosha':
+        if (isStellarTeam) power += 14;
+        else power -= 18;
+        break;
+      case 'aino':
+        if (hasAnyLunar) power += 16;
+        else if (isStellarTeam) power -= 8; // Hydro disrupts pure Stellar-Conduct
+        break;
+      case 'jahoda':
+        if (hasAnyLunar) power += 15;
+        else if (hasEl('Cryo') || hasEl('Electro') || hasEl('Pyro')) power += 7;
+        break;
+      case 'fischl':
+        if (
+          meta.lunarChargedActive ||
+          meta.lunarBloomActive ||
+          isStellarTeam ||
+          meta.chevreuseValid ||
+          meta.lunarCrystallizeActive
+        ) {
+          power += 15;
+        } else {
+          power += 8;
+        }
+        break;
+      case 'bennett':
+        if (hasZibai && !ids.has('xiangling')) power += 3;
+        else if (hasMitya && !ids.has('xiangling')) power += 2;
+        else if (hasLauma) power -= 4; // Pyro Burning disrupts Bloom/Hyperbloom
+        else power += 15;
+        break;
+      case 'xiangling':
+        if (ids.has('bennett')) power += 14;
+        else if (meta.chevreuseValid) power += 10;
+        else power -= 8;
+        break;
+      case 'sucrose':
+        if (
+          meta.lunarChargedActive ||
+          isStellarTeam ||
+          meta.reactions.some((r) => r.name === 'Melt' || r.name === 'Vaporize')
+        ) {
+          power += 14;
+        } else if (hasZibai) {
+          power -= 10;
+        } else {
+          power += 6;
+        }
+        break;
+      case 'noelle':
+        if (hasZibai || elCount('Geo') >= 2) power += 14;
+        else power -= 18;
+        break;
+      case 'kachina':
+        if (hasZibai || elCount('Geo') >= 2) power += 14;
+        else power -= 8;
+        break;
+      case 'baizhu':
+        if (meta.lunarBloomActive || hasEl('Dendro')) power += 16;
+        else power += 2;
+        break;
+      case 'rosaria':
+        if (isStellarTeam || meta.reactions.some((r) => r.name === 'Melt')) {
+          power += 13;
+        } else {
+          power += 3;
+        }
+        break;
+      case 'charlotte':
+        if (isStellarTeam || meta.reactions.some((r) => r.name === 'Freeze')) {
+          power += 10;
+        } else {
+          power += 2;
+        }
+        break;
+      case 'diona':
+        if (isStellarTeam || elCount('Cryo') >= 2) power += 10;
+        else power += 2;
+        break;
+      case 'yumemizuki-mizuki':
+        if (meta.stellarState === 'Stellar Swirl Active') power += 14;
+        else if (hasFlins || hasZibai || hasMitya) power -= 12;
+        else power += 8;
+        break;
+      case 'dehya':
+        power -= 6;
+        break;
+      case 'barbara':
+        if (meta.lunarBloomActive || meta.lunarChargedActive) power += 7;
+        else if (isStellarTeam || meta.reactions.some((r) => r.name === 'Melt')) {
+          power -= 10;
+        }
+        break;
+      case 'amber':
+      case 'xinyan':
+        power -= 14;
+        break;
+    }
+  }
+
+  // 5. Field-time clash check
+  const selfishCarryIds = new Set([
+    'flins',
+    'zibai',
+    'noelle',
+    'gaming',
+    'kaveh',
+    'yumemizuki-mizuki',
+  ]);
+  const selfishCount = valid.filter((c) => selfishCarryIds.has(c.id)).length;
+  if (selfishCount >= 2) {
+    const isOnlyZibaiNoelle =
+      selfishCount === 2 && hasZibai && ids.has('noelle');
+    if (!isOnlyZibaiNoelle) {
+      power -= 24;
+    }
+  }
+
+  // 6. Resonance & level readiness
+  power += Math.min(meta.resonances.length * 4, 8);
+  const avgLevel = valid.reduce((s, c) => s + c.level, 0) / valid.length;
+  power += (avgLevel / 90) * 14;
+
+  return power;
 }
 
 export function analyzeTeam(members: Character[]): TeamAnalysis {
@@ -331,7 +610,7 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
     });
   }
 
-  // Pairwise Synergy Edges (for visual SVG link graph between slots)
+  // Pairwise Synergy Edges
   const edges: SynergyEdge[] = [];
   for (let i = 0; i < valid.length; i++) {
     for (let j = i + 1; j < valid.length; j++) {
@@ -339,7 +618,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
       const b = valid[j];
       const els = new Set<ElementType>([a.element, b.element]);
 
-      // Stellar-Conduct pair
       if (
         els.has('Cryo') &&
         els.has('Electro') &&
@@ -356,7 +634,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
         continue;
       }
 
-      // Stellar Swirl pair
       if (
         els.has('Cryo') &&
         els.has('Anemo') &&
@@ -373,7 +650,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
         continue;
       }
 
-      // Lunar pairs
       if (
         els.has('Electro') &&
         els.has('Hydro') &&
@@ -420,7 +696,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
         continue;
       }
 
-      // Moonsign pair (Ascendant Gleam)
       if (a.moonsignLevel > 0 && b.moonsignLevel > 0) {
         edges.push({
           fromIndex: i,
@@ -432,7 +707,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
         continue;
       }
 
-      // Same-element resonance / battery
       if (a.element === b.element) {
         edges.push({
           fromIndex: i,
@@ -444,7 +718,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
         continue;
       }
 
-      // Key reactions
       if (els.has('Cryo') && els.has('Pyro')) {
         edges.push({
           fromIndex: i,
@@ -493,7 +766,7 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
           toIndex: j,
           label: 'Swirl',
           kind: 'support',
-          description: `${a.name} + ${b.name} chain Swirl AoE & elemental buffs.`,
+          description: `${a.name} + ${b.name} chain Swirl AoE & Viridescent RES shred.`,
         });
       }
     }
@@ -516,9 +789,7 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
   const strengths: string[] = [];
 
   if (survivability === 'Glass Cannon') {
-    warnings.push(
-      'No Healer or Shielder slotted — running Glass Cannon mode.'
-    );
+    warnings.push('No Healer or Shielder slotted — running Glass Cannon mode.');
   } else {
     const sustainNames = valid
       .filter((c) => c.isHealer || c.isShielder)
@@ -544,7 +815,7 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
     }
     if (!hasEl('Hydro')) {
       warnings.push(
-        'Lunar-Charged, Lunar-Bloom, and Lunar-Crystallize all rely on Hydro application (unless fighting a Hydro-aura boss like Hydro Tulpa).'
+        'Lunar-Charged, Lunar-Bloom, and Lunar-Crystallize rely on Hydro application (unless fighting a Hydro-aura boss like Hydro Tulpa).'
       );
     }
   }
@@ -575,92 +846,32 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
     }
   }
 
-  if (valid.some((c) => c.mechanicTags.includes('hexerei'))) {
-    strengths.push(
-      'Prune provides Team DMG Bonus & Anemo ATK buff (Hexerei passive scales further with a 2nd Hexerei unit).'
-    );
-  }
-
-  // Worth Leveling callouts for unbuilt characters
   const levelingCallouts: LevelingCallout[] = valid
     .filter((c) => c.level < BATTLE_READY_LEVEL)
-    .map((c) => {
-      let reason = `Currently Lv ${c.level} — level to 70/80+ for comfortable Spiral Abyss & endgame survivability.`;
-      if (c.id === 'alyosha') {
-        reason =
-          'Lv 1 Stellar-Conduct Specialist & Healer — top investment priority if you play Cryo Traveller Stellar-Conduct teams!';
-      } else if (c.id === 'chevreuse') {
-        reason =
-          'Lv 1 Overloaded Specialist — unlocks -40% Pyro/Electro RES shred & healing for Flins / Fischl / Xiangling cores.';
-      } else if (c.id === 'baizhu') {
-        reason =
-          'Lv 1 5★ Dendro Healer & Reaction Buffer — huge comfort upgrade for Lauma Lunar-Bloom / Hyperbloom teams.';
-      } else if (c.id === 'kachina') {
-        reason =
-          'Lv 40 Nightsoul Geo Sub-DPS — pairs cleanly with Zibai for Geo Resonance and Natlan Void Ward checks.';
-      } else if (c.id === 'lynette') {
-        reason =
-          'Lv 25 Arkhe: Ousia Anemo Support — helpful for Fontaine Clockwork Meka & Pneuma boss stuns.';
-      } else if (c.id === 'mona') {
-        reason =
-          'Lv 1 5★ Hydro Omen Buffer — alternative Hydro option when Aino is locked on the other Spiral Abyss side.';
-      } else if (c.id === 'prune') {
-        reason =
-          'Lv 1 Hexerei Support — brings Team DMG% and Anemo ATK buffing.';
-      } else if (c.id === 'diona') {
-        reason =
-          'Lv 1 Cryo Shielder & Battery — grants Cryo Resonance (+15% CRIT Rate) and energy for Cryo Traveller.';
-      }
-      return {
-        characterId: c.id,
-        characterName: c.name,
-        currentLevel: c.level,
-        reason,
-      };
-    });
+    .map((c) => ({
+      characterId: c.id,
+      characterName: c.name,
+      currentLevel: c.level,
+      reason: `Currently Lv ${c.level} — level to 70/80+ for Spiral Abyss & endgame comfort.`,
+    }));
 
-  // Overall Synergy Score (0–98) with realistic spread
-  let score = 46;
-  if (survivability === 'Strong') score += 11;
-  else if (survivability === 'Covered') score += 10;
-  else score -= 10;
+  // Calibrated meta power -> realistic 35..98 displayed score without artificial 98 ties
+  const rawPower = computeRawTeamPower(valid, {
+    lunarChargedActive,
+    lunarBloomActive,
+    lunarCrystallizeActive,
+    moonsignTier,
+    stellarState,
+    chevreuseValid,
+    survivability,
+    healerCount,
+    reactions,
+    resonances,
+  });
 
-  if (lunarChargedActive || lunarBloomActive || lunarCrystallizeActive) {
-    score += 12;
-    if (moonsignTier === 'Ascendant Gleam') score += 11;
-  }
-  if (stellarState === 'Stellar-Conduct Active') score += 16;
-  else if (stellarState === 'Stellar Swirl Active') score += 11;
-
-  if (chevreuseValid === true) score += 15;
-  if (chevreuseValid === false) score -= 22;
-
-  score += Math.min(reactions.length * 3, 12);
-  score += Math.min(resonances.length * 4, 8);
-
-  const selfishOnFieldCount = valid.filter((c) => {
-    const r = c.role.toLowerCase();
-    return (
-      (r.includes('on-field dps') || r.includes('on-field plunge dps')) &&
-      !c.isHealer
-    );
-  }).length;
-  if (selfishOnFieldCount === 1) score += 6;
-  else if (selfishOnFieldCount >= 2) score -= 14;
-
-  const offFieldSupportCount = valid.filter(
-    (c) => c.isOffField || c.isSupport
-  ).length;
-  if (offFieldSupportCount >= 3) score += 4;
-
-  // Gentle level readiness bonus
-  const avgLevel =
-    valid.length > 0
-      ? valid.reduce((s, c) => s + c.level, 0) / valid.length
-      : 0;
-  score += Math.round((avgLevel / 90) * 6);
-
-  const clampedScore = Math.max(20, Math.min(98, Math.round(score)));
+  // Map rawPower ~ [85..245] smoothly to [40..98]
+  const calibrated = Math.round(40 + ((rawPower - 85) / 160) * 58);
+  const clampedScore = Math.max(25, Math.min(98, calibrated));
   const minLevel =
     valid.length > 0 ? Math.min(...valid.map((c) => c.level)) : 0;
 

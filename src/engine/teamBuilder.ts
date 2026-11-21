@@ -10,6 +10,7 @@ import type {
 import {
   analyzeTeam,
   BATTLE_READY_LEVEL,
+  computeRawTeamPower,
   inferSlotRoles,
 } from './teamAnalyzer';
 
@@ -19,7 +20,7 @@ function scoreCandidateForFilters(
   encounter: EncounterDefinition | null,
   anchorId: string | null
 ): number {
-  let score = char.level * 0.6;
+  let score = char.level * 0.55;
   if (char.rarity === 5) score += 8;
   if (char.id === anchorId) score += 1000;
 
@@ -31,10 +32,8 @@ function scoreCandidateForFilters(
       score += 35;
     }
     if (archetype.keyElements.includes(char.element)) score += 28;
-    if (
-      archetype.requiredTags?.some((t) => char.mechanicTags.includes(t))
-    ) {
-      score += 70;
+    if (archetype.requiredTags?.some((t) => char.mechanicTags.includes(t))) {
+      score += 75;
     }
     if (archetype.prefersMoonsign && char.moonsignLevel > 0) score += 45;
     if (
@@ -42,24 +41,61 @@ function scoreCandidateForFilters(
       (char.mechanicTags.includes('stellar-glimmer') ||
         char.mechanicTags.includes('stellar-conduct'))
     ) {
-      score += 65;
+      score += 70;
+    }
+
+    // Archetype-specific meta pillars so they always enter the combination pool
+    if (
+      archetype.id === 'stellar-conduct' &&
+      ['traveller', 'mitya', 'alyosha', 'fischl', 'kaeya', 'rosaria', 'charlotte', 'diona', 'sucrose', 'bennett', 'lan-yan'].includes(char.id)
+    ) {
+      score += 32;
+    }
+    if (
+      archetype.id === 'lunar-charged' &&
+      ['flins', 'aino', 'jahoda', 'fischl', 'sucrose', 'barbara', 'bennett', 'mona'].includes(char.id)
+    ) {
+      score += 32;
+    }
+    if (
+      archetype.id === 'lunar-bloom' &&
+      ['lauma', 'aino', 'fischl', 'baizhu', 'jahoda', 'barbara', 'flins', 'yaoyao'].includes(char.id)
+    ) {
+      score += 32;
+    }
+    if (
+      archetype.id === 'lunar-crystallize' &&
+      ['zibai', 'aino', 'noelle', 'kachina', 'fischl', 'jahoda', 'bennett', 'barbara'].includes(char.id)
+    ) {
+      score += 32;
+    }
+    if (
+      archetype.id === 'melt-cryo-pyro' &&
+      ['traveller', 'kaeya', 'rosaria', 'xiangling', 'bennett', 'sucrose', 'charlotte', 'diona'].includes(char.id)
+    ) {
+      score += 32;
     }
   }
 
   if (encounter) {
     if (encounter.avoidElements?.includes(char.element)) score -= 90;
     if (encounter.preferredElements.includes(char.element)) score += 24;
-    if (
-      encounter.requiredTags?.some((t) => char.mechanicTags.includes(t))
-    ) {
+    if (encounter.requiredTags?.some((t) => char.mechanicTags.includes(t))) {
       score += 55;
     }
   }
 
   // Versatile roster pillars
-  if (char.isHealer) score += 16;
-  if (char.isShielder) score += 10;
-  if (char.isOffField) score += 12;
+  if (
+    ['bennett', 'fischl', 'aino', 'jahoda', 'sucrose', 'xiangling'].includes(
+      char.id
+    )
+  ) {
+    score += 18;
+  }
+  if (char.isHealer) score += 14;
+  if (char.isShielder) score += 8;
+  if (char.isOffField) score += 10;
 
   return score;
 }
@@ -109,7 +145,9 @@ function deriveTeamTitle(
     return `${encounter.name.split('/')[0].trim()} Counter`;
   }
   if (analysis.stellarState === 'Stellar-Conduct Active') {
-    return 'Stellar-Conduct Frostbreaker';
+    return members.some((m) => m.id === 'mitya')
+      ? 'Mitya Stellar-Conduct Core'
+      : 'Stellar-Conduct Frostbreaker';
   }
   if (analysis.reactions.some((r) => r.name === 'Lunar-Charged')) {
     return analysis.moonsignTier === 'Ascendant Gleam'
@@ -142,7 +180,6 @@ export function generateRecommendedTeams(
     ENCOUNTERS.find((e) => e.id === filters.encounterId) ?? null;
   const excluded = new Set(filters.excludedCharacterIds);
 
-  // Filter roster by excluded & level readiness (always allow explicitly chosen anchor)
   const eligible = roster.filter((c) => {
     if (excluded.has(c.id)) return false;
     if (c.id === filters.anchorCharacterId) return true;
@@ -152,16 +189,25 @@ export function generateRecommendedTeams(
 
   if (eligible.length < 4) return [];
 
-  // Rank candidates and take top 16 to evaluate all 4-combinations rapidly (<= 1,820 combos)
+  // Evaluate top 18 candidates (up to 3,060 4-combos — runs in ~8ms)
   const rankedPool = [...eligible]
     .sort(
       (a, b) =>
-        scoreCandidateForFilters(b, archetype, encounter, filters.anchorCharacterId) -
-        scoreCandidateForFilters(a, archetype, encounter, filters.anchorCharacterId)
+        scoreCandidateForFilters(
+          b,
+          archetype,
+          encounter,
+          filters.anchorCharacterId
+        ) -
+        scoreCandidateForFilters(
+          a,
+          archetype,
+          encounter,
+          filters.anchorCharacterId
+        )
     )
-    .slice(0, 16);
+    .slice(0, 18);
 
-  // Ensure anchor is in pool
   if (filters.anchorCharacterId) {
     const anchor = eligible.find((c) => c.id === filters.anchorCharacterId);
     if (anchor && !rankedPool.some((c) => c.id === anchor.id)) {
@@ -169,7 +215,6 @@ export function generateRecommendedTeams(
     }
   }
 
-  // Ensure at least 2 healers/shielders are in pool if survivability is required
   if (filters.requireSurvivability) {
     const sustainInPool = rankedPool.filter(
       (c) => c.isHealer || c.isShielder
@@ -229,68 +274,108 @@ export function generateRecommendedTeams(
           }
 
           const analysis = analyzeTeam(combo);
-          let rankScore = analysis.score;
+          // Use full-resolution unclamped raw power so the strongest meta teams cleanly separate!
+          const healerCount = combo.filter((c) => c.isHealer).length;
+          let rankScore = computeRawTeamPower(combo, {
+            lunarChargedActive: analysis.reactions.some(
+              (r) => r.name === 'Lunar-Charged'
+            ),
+            lunarBloomActive: analysis.reactions.some(
+              (r) => r.name === 'Lunar-Bloom'
+            ),
+            lunarCrystallizeActive: analysis.reactions.some(
+              (r) => r.name === 'Lunar-Crystallize'
+            ),
+            moonsignTier: analysis.moonsignTier,
+            stellarState: analysis.stellarState,
+            chevreuseValid: analysis.chevreuseValid,
+            survivability: analysis.survivability,
+            healerCount,
+            reactions: analysis.reactions,
+            resonances: analysis.resonances,
+          });
 
-          // Archetype-specific scoring
+          const comboIds = new Set(combo.map((c) => c.id));
+
+          // Archetype-specific high-precision ranking
           if (archetype) {
             if (archetype.id === 'stellar-conduct') {
               if (analysis.stellarState === 'Stellar-Conduct Active') {
-                rankScore += 45;
+                rankScore += 55;
               } else {
-                rankScore -= 40;
+                rankScore -= 80;
               }
-              if (combo.some((c) => c.id === 'alyosha')) rankScore += 18;
+              if (comboIds.has('mitya')) rankScore += 22;
+              if (comboIds.has('alyosha')) rankScore += 20;
+              if (comboIds.has('traveller')) rankScore += 18;
+              if (comboIds.has('fischl')) rankScore += 12;
+              if (comboIds.has('flins') || comboIds.has('zibai') || comboIds.has('lauma')) {
+                rankScore -= 30;
+              }
             } else if (archetype.id === 'stellar-swirl') {
               if (analysis.stellarState === 'Stellar Swirl Active') {
-                rankScore += 42;
+                rankScore += 55;
               } else {
-                rankScore -= 35;
+                rankScore -= 70;
               }
+              if (comboIds.has('yumemizuki-mizuki')) rankScore += 18;
+              if (comboIds.has('sucrose')) rankScore += 12;
             } else if (archetype.id === 'lunar-charged') {
               if (analysis.reactions.some((r) => r.name === 'Lunar-Charged')) {
-                rankScore += 42;
+                rankScore += 60;
               } else {
-                rankScore -= 45;
+                rankScore -= 85;
               }
-              if (analysis.moonsignTier === 'Ascendant Gleam') rankScore += 20;
+              if (analysis.moonsignTier === 'Ascendant Gleam') rankScore += 24;
+              if (comboIds.has('fischl')) rankScore += 16;
+              if (comboIds.has('jahoda') || comboIds.has('sucrose')) rankScore += 14;
+              if (comboIds.has('zibai') || comboIds.has('traveller')) rankScore -= 25;
             } else if (archetype.id === 'lunar-bloom') {
               if (analysis.reactions.some((r) => r.name === 'Lunar-Bloom')) {
-                rankScore += 42;
+                rankScore += 60;
               } else {
-                rankScore -= 45;
+                rankScore -= 85;
               }
-              if (analysis.moonsignTier === 'Ascendant Gleam') rankScore += 20;
+              if (analysis.moonsignTier === 'Ascendant Gleam') rankScore += 24;
               if (analysis.reactions.some((r) => r.name === 'Hyperbloom')) {
-                rankScore += 10;
+                rankScore += 14;
               }
+              if (comboIds.has('baizhu')) rankScore += 16;
+              if (comboIds.has('zibai')) rankScore -= 30;
             } else if (archetype.id === 'lunar-crystallize') {
               if (
                 analysis.reactions.some((r) => r.name === 'Lunar-Crystallize')
               ) {
-                rankScore += 45;
+                rankScore += 60;
               } else {
-                rankScore -= 45;
+                rankScore -= 85;
               }
-              if (analysis.moonsignTier === 'Ascendant Gleam') rankScore += 20;
+              if (analysis.moonsignTier === 'Ascendant Gleam') rankScore += 24;
               if (combo.filter((c) => c.element === 'Geo').length >= 2) {
-                rankScore += 12;
+                rankScore += 18;
               }
+              if (comboIds.has('lauma')) rankScore -= 30;
             } else if (archetype.id === 'ascendant-gleam-multi') {
-              rankScore += analysis.moonsignTotal * 14;
+              rankScore += analysis.moonsignTotal * 18;
             } else if (archetype.id === 'overloaded-chevreuse') {
-              if (analysis.chevreuseValid) rankScore += 55;
+              if (analysis.chevreuseValid) rankScore += 75;
               else if (
                 analysis.reactions.some((r) => r.name === 'Overloaded')
               ) {
                 rankScore += 15;
               } else {
-                rankScore -= 35;
+                rankScore -= 60;
               }
+              if (comboIds.has('flins') && comboIds.has('fischl')) rankScore += 14;
+              if (comboIds.has('bennett')) rankScore += 12;
             } else if (archetype.id === 'melt-cryo-pyro') {
               if (analysis.reactions.some((r) => r.name === 'Melt')) {
-                rankScore += 36;
+                rankScore += 50;
               } else {
-                rankScore -= 35;
+                rankScore -= 70;
+              }
+              if (comboIds.has('bennett') && comboIds.has('xiangling')) {
+                rankScore += 24;
               }
             } else if (archetype.id === 'swirl-taser') {
               const hasAnemoDriver = combo.some(
@@ -298,21 +383,21 @@ export function generateRecommendedTeams(
                   c.element === 'Anemo' &&
                   c.role.toLowerCase().includes('driver')
               );
-              if (hasAnemoDriver) rankScore += 28;
+              if (hasAnemoDriver) rankScore += 32;
               if (analysis.reactions.some((r) => r.name === 'Swirl')) {
-                rankScore += 16;
+                rankScore += 18;
               }
             } else if (archetype.id === 'nightsoul-geo') {
               if (combo.some((c) => c.mechanicTags.includes('nightsoul'))) {
-                rankScore += 45;
+                rankScore += 55;
               } else {
-                rankScore -= 35;
+                rankScore -= 65;
               }
             } else if (archetype.id === 'arkhe-ousia') {
               if (combo.some((c) => c.mechanicTags.includes('arkhe-ousia'))) {
-                rankScore += 45;
+                rankScore += 55;
               } else {
-                rankScore -= 35;
+                rankScore -= 65;
               }
             }
           }
@@ -323,7 +408,7 @@ export function generateRecommendedTeams(
               const badCount = combo.filter((c) =>
                 encounter.avoidElements!.includes(c.element)
               ).length;
-              rankScore -= badCount * 38;
+              rankScore -= badCount * 45;
             }
             const prefMatches = new Set(
               combo
@@ -337,34 +422,20 @@ export function generateRecommendedTeams(
                 combo.some((c) => c.mechanicTags.includes(tag))
               )
             ) {
-              rankScore += 22;
+              rankScore += 26;
             }
             if (
               encounter.id === 'nod-krai-ascendant' &&
               analysis.moonsignTier === 'Ascendant Gleam'
             ) {
-              rankScore += 24;
+              rankScore += 28;
             }
             if (
               encounter.id === 'geo-golem-shields' &&
               combo.some((c) => c.element === 'Geo' || c.weapon === 'Claymore')
             ) {
-              rankScore += 18;
+              rankScore += 22;
             }
-          }
-
-          // When Include Unbuilt is on AND an archetype/anchor benefits from a standout unbuilt unit, give small variety nudge
-          if (filters.includeUnbuilt && analysis.levelingCallouts.length > 0) {
-            const hasKeyUnbuilt = combo.some(
-              (c) =>
-                c.level < BATTLE_READY_LEVEL &&
-                (c.id === 'alyosha' ||
-                  c.id === 'chevreuse' ||
-                  c.id === 'baizhu' ||
-                  c.id === 'kachina' ||
-                  c.id === 'lynette')
-            );
-            if (hasKeyUnbuilt) rankScore += 8;
           }
 
           // Order slots nicely: Main DPS -> Sub-DPS -> Utility -> Healer
@@ -392,7 +463,6 @@ export function generateRecommendedTeams(
 
   scoredCombos.sort((a, b) => b.rankScore - a.rankScore);
 
-  // Pick diverse top recommendations (avoid returning 6 near-identical teams sharing 3/4 members unless nothing else)
   const picked: TeamRecommendation[] = [];
   const seenKeys = new Set<string>();
 
@@ -404,12 +474,14 @@ export function generateRecommendedTeams(
       .join('|');
     if (seenKeys.has(key)) continue;
 
-    // Encourage diversity in the top results
-    const tooSimilar = picked.some((existing) => {
-      const existingIds = new Set(existing.members.map((m) => m.id));
-      const overlap = item.members.filter((m) => existingIds.has(m.id)).length;
-      return overlap >= 3 && picked.length < 4;
-    });
+    // Keep #1 pure best, then encourage sensible variety across options 2-4
+    const tooSimilar =
+      picked.length >= 1 &&
+      picked.some((existing) => {
+        const existingIds = new Set(existing.members.map((m) => m.id));
+        const overlap = item.members.filter((m) => existingIds.has(m.id)).length;
+        return overlap >= 3 && picked.length < 3;
+      });
     if (tooSimilar && scoredCombos.length > maxResults * 3) continue;
 
     seenKeys.add(key);
@@ -442,7 +514,6 @@ export function generateRecommendedTeams(
     });
   }
 
-  // If strict diversity filtered too aggressively, top up from remaining highest-ranked
   if (picked.length < maxResults) {
     for (const item of scoredCombos) {
       if (picked.length >= maxResults) break;
@@ -502,9 +573,7 @@ export function getSlotSubstitutes(
 ): SlotSubstitute[] {
   const baseline = analyzeTeam(currentMembers);
   const currentIds = new Set(
-    currentMembers
-      .filter((_, idx) => idx !== slotIndex)
-      .map((c) => c.id)
+    currentMembers.filter((_, idx) => idx !== slotIndex).map((c) => c.id)
   );
   const excludedSet = new Set(excludedIds);
 
