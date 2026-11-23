@@ -46,6 +46,10 @@ import {
   TeamVisualizer,
   type OriginContext,
 } from './components/TeamVisualizer';
+import {
+  TopTeamsView,
+  type TopTeamsCategory,
+} from './components/TopTeamsView';
 import { BossesView, type BossFilterKey } from './components/BossesView';
 import { AbyssPlanner } from './components/AbyssPlanner';
 import { RegionalPresets, type NationName } from './components/RegionalPresets';
@@ -64,6 +68,7 @@ const EMPTY_SLOTS: [
 
 const VALID_TABS: ActiveTab[] = [
   'visualizer',
+  'top-teams',
   'bosses',
   'abyss',
   'regions',
@@ -100,10 +105,13 @@ export default function App() {
   const [inspectedCharacter, setInspectedCharacter] =
     useState<Character | null>(null);
 
-  // Breadcrumb origin context when jumping into Team Circle from Bosses/Regions/Roster
+  // Breadcrumb origin context when jumping into Team Circle from Bosses/Regions/Roster/Top Teams
   const [originContext, setOriginContext] = useState<OriginContext | null>(null);
 
   // Preserved per-tab filters so switching tabs never loses your place
+  const [topTeamsSearch, setTopTeamsSearch] = useState('');
+  const [topTeamsCategory, setTopTeamsCategory] =
+    useState<TopTeamsCategory>('All');
   const [bossSearch, setBossSearch] = useState('');
   const [bossFilterKey, setBossFilterKey] = useState<BossFilterKey>('All');
   const [regionSearch, setRegionSearch] = useState('');
@@ -788,6 +796,39 @@ export default function App() {
               onNavigateTab={(tab) => setActiveTab(tab, true)}
             />
           </>
+        )}
+
+        {activeTab === 'top-teams' && (
+          <TopTeamsView
+            roster={roster}
+            includeUnbuilt={filters.includeUnbuilt}
+            requireSurvivability={filters.requireSurvivability}
+            search={topTeamsSearch}
+            onChangeSearch={setTopTeamsSearch}
+            category={topTeamsCategory}
+            onChangeCategory={setTopTeamsCategory}
+            onOpenTeamInCircle={(team, rank) => {
+              setSelectedRegionId(null);
+              setFilters((prev) => ({
+                ...prev,
+                archetypeId: null,
+                encounterId: null,
+                anchorCharacterId: null,
+              }));
+              setSelectedRecId(null);
+              setManualSlots(team.members);
+              setManualTeam(team);
+              setOriginContext({
+                fromTab: 'top-teams',
+                label: 'Top Teams',
+                detail: `#${rank} · Score ${team.analysis.score}`,
+              });
+              setFatesBurstKey((k) => k + 1);
+              setActiveTab('visualizer');
+            }}
+            onInspectCharacter={(char) => setInspectedCharacter(char)}
+            onSendToAbyss={handleSendToAbyss}
+          />
         )}
 
         {activeTab === 'bosses' && (

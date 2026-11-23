@@ -49,7 +49,7 @@ interface TeamVisualizerProps {
   onSaveTeam: (team: TeamRecommendation) => void;
   onCopySheetRow: (team: TeamRecommendation) => void;
   onSendToAbyss: (team: TeamRecommendation, half: 1 | 2) => void;
-  onNavigateTab: (tab: 'bosses' | 'regions' | 'roster') => void;
+  onNavigateTab: (tab: 'top-teams' | 'bosses' | 'regions' | 'roster') => void;
 }
 
 export function TeamVisualizer({
@@ -230,6 +230,14 @@ export function TeamVisualizer({
                 >
                   <PrimogemStar size={13} />
                   Fate&apos;s Pick
+                </button>
+                <button
+                  type="button"
+                  className="btn-subtle"
+                  onClick={() => onNavigateTab('top-teams')}
+                >
+                  Strongest Teams by Score
+                  <ArrowUpRight size={13} />
                 </button>
                 <button
                   type="button"

@@ -46,6 +46,15 @@ export function Header({
           </button>
 
           <button
+            id="nav-top-teams"
+            type="button"
+            className={`nav-link ${activeTab === 'top-teams' ? 'active' : ''}`}
+            onClick={() => onSelectTab('top-teams')}
+          >
+            Top Teams
+          </button>
+
+          <button
             id="nav-bosses"
             type="button"
             className={`nav-link ${activeTab === 'bosses' ? 'active' : ''}`}

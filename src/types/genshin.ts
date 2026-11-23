@@ -185,4 +185,11 @@ export interface AppSettings {
   dataSource: 'snapshot' | 'live-sheets';
 }
 
-export type ActiveTab = 'visualizer' | 'bosses' | 'abyss' | 'regions' | 'roster' | 'saved';
+export type ActiveTab =
+  | 'visualizer'
+  | 'top-teams'
+  | 'bosses'
+  | 'abyss'
+  | 'regions'
+  | 'roster'
+  | 'saved';

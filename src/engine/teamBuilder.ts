@@ -719,6 +719,149 @@ export function getSlotSubstitutes(
   return subs;
 }
 
+export interface RankedStrongestTeam {
+  rank: number;
+  team: TeamRecommendation;
+  compatibilityScore: number;
+  rawPower: number;
+  category: 'Lunar' | 'Stellar' | 'Melt / Vape' | 'Overloaded' | 'Hyperbloom' | 'Elemental';
+}
+
+function classifyTeamCategory(
+  team: TeamRecommendation
+): RankedStrongestTeam['category'] {
+  const names = team.analysis.reactions.map((r) => r.name);
+  if (
+    names.includes('Lunar-Charged') ||
+    names.includes('Lunar-Bloom') ||
+    names.includes('Lunar-Crystallize') ||
+    team.analysis.moonsignTier === 'Ascendant Gleam'
+  ) {
+    return 'Lunar';
+  }
+  if (team.analysis.stellarState.includes('Active')) {
+    return 'Stellar';
+  }
+  if (team.analysis.chevreuseValid || names.includes('Overloaded')) {
+    return 'Overloaded';
+  }
+  if (names.includes('Hyperbloom') || names.includes('Bloom')) {
+    return 'Hyperbloom';
+  }
+  if (names.includes('Melt') || names.includes('Vaporize')) {
+    return 'Melt / Vape';
+  }
+  return 'Elemental';
+}
+
+/**
+ * Computes the user's strongest distinct teams across their roster,
+ * strictly ordered by compatibility score (and tie-broken by meta power).
+ */
+export function generateRankedStrongestTeams(
+  roster: Character[],
+  options: {
+    includeUnbuilt: boolean;
+    requireSurvivability: boolean;
+    maxResults?: number;
+  }
+): RankedStrongestTeam[] {
+  const { includeUnbuilt, requireSurvivability, maxResults = 16 } = options;
+
+  const baseFilters: BuilderFilters = {
+    archetypeId: null,
+    encounterId: null,
+    anchorCharacterId: null,
+    includeUnbuilt,
+    requireSurvivability,
+    excludedCharacterIds: [],
+  };
+
+  const uniqueMap = new Map<string, TeamRecommendation>();
+  const register = (recs: TeamRecommendation[]) => {
+    for (const rec of recs) {
+      const sig = rec.members
+        .map((m) => m.id)
+        .slice()
+        .sort()
+        .join('|');
+      if (!uniqueMap.has(sig)) {
+        uniqueMap.set(sig, rec);
+      }
+    }
+  };
+
+  // 1. Broad top general combinations
+  register(generateRecommendedTeams(roster, baseFilters, 8));
+
+  // 2. Top 2 builds per reaction archetype so every viable playstyle is represented
+  for (const arch of ARCHETYPES) {
+    register(
+      generateRecommendedTeams(
+        roster,
+        { ...baseFilters, archetypeId: arch.id },
+        2
+      )
+    );
+  }
+
+  // Score every unique team with unclamped raw power for fair tie-breaking
+  const scored = Array.from(uniqueMap.values()).map((team) => {
+    const a = team.analysis;
+    const healerCount = team.members.filter((m) => m.isHealer).length;
+    const rawPower = computeRawTeamPower(team.members, {
+      lunarChargedActive: a.reactions.some((r) => r.name === 'Lunar-Charged'),
+      lunarBloomActive: a.reactions.some((r) => r.name === 'Lunar-Bloom'),
+      lunarCrystallizeActive: a.reactions.some(
+        (r) => r.name === 'Lunar-Crystallize'
+      ),
+      moonsignTier: a.moonsignTier,
+      stellarState: a.stellarState,
+      chevreuseValid: a.chevreuseValid,
+      survivability: a.survivability,
+      healerCount,
+      reactions: a.reactions,
+      resonances: a.resonances,
+    });
+    return {
+      team,
+      compatibilityScore: a.score,
+      rawPower,
+      category: classifyTeamCategory(team),
+    };
+  });
+
+  // Sort strictly descending by compatibility score, then unclamped power
+  scored.sort((a, b) => {
+    if (b.compatibilityScore !== a.compatibilityScore) {
+      return b.compatibilityScore - a.compatibilityScore;
+    }
+    return b.rawPower - a.rawPower;
+  });
+
+  // Keep distinct teams: avoid showing more than 2 variations sharing 3+ identical teammates
+  const selected: RankedStrongestTeam[] = [];
+  for (const item of scored) {
+    if (selected.length >= maxResults) break;
+    const ids = new Set(item.team.members.map((m) => m.id));
+    const nearDupCount = selected.filter((existing) => {
+      const overlap = existing.team.members.filter((m) => ids.has(m.id)).length;
+      return overlap >= 3;
+    }).length;
+    if (nearDupCount >= 2) continue;
+
+    selected.push({
+      rank: selected.length + 1,
+      team: item.team,
+      compatibilityScore: item.compatibilityScore,
+      rawPower: item.rawPower,
+      category: item.category,
+    });
+  }
+
+  return selected;
+}
+
 export function formatTeamAsSheetRow(
   members: Character[],
   teamName: string,

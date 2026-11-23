@@ -2020,6 +2020,91 @@ button {
   border-color: var(--gold-bright);
 }
 
+/* Strongest Teams Ranked Leaderboard Rows */
+.ranked-team-row {
+  display: grid;
+  grid-template-columns: 112px minmax(240px, 1.25fr) auto auto;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 8px;
+  border-bottom: 1px solid var(--hairline);
+  transition: background-color 0.16s ease;
+}
+
+.ranked-team-row:hover {
+  background: var(--bg-subtle);
+}
+
+.rank-score-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
+.rank-badge.top {
+  color: var(--gold-bright);
+}
+
+.score-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.score-numeral {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+}
+
+.score-denom {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+
+.score-bar-track {
+  width: 86px;
+  height: 3.5px;
+  border-radius: 999px;
+  background: rgba(246, 240, 228, 0.09);
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.ranked-team-meta {
+  min-width: 0;
+}
+
+.ranked-team-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-top: 3px;
+}
+
 /* Respect Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   body::before,
@@ -2047,6 +2132,7 @@ button {
   }
   .region-row,
   .boss-row,
+  .ranked-team-row,
   .focus-build-row {
     grid-template-columns: 1fr;
     gap: 12px;
