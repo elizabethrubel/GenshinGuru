@@ -31,7 +31,7 @@ interface TeamVisualizerProps {
   onSaveTeam: (team: TeamRecommendation) => void;
   onCopySheetRow: (team: TeamRecommendation) => void;
   onSendToAbyss: (team: TeamRecommendation, half: 1 | 2) => void;
-  onNavigateTab: (tab: 'regions' | 'roster') => void;
+  onNavigateTab: (tab: 'bosses' | 'regions' | 'roster') => void;
 }
 
 export function TeamVisualizer({
@@ -197,9 +197,17 @@ export function TeamVisualizer({
                 <button
                   type="button"
                   className="btn-subtle"
+                  onClick={() => onNavigateTab('bosses')}
+                >
+                  Boss Matchups (Wavebinder, Stygian 7.2)
+                  <ArrowUpRight size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="btn-subtle"
                   onClick={() => onNavigateTab('regions')}
                 >
-                  Browse Party by Region
+                  Party by Region
                   <ArrowUpRight size={13} />
                 </button>
                 <button
@@ -207,7 +215,7 @@ export function TeamVisualizer({
                   className="btn-subtle"
                   onClick={() => onNavigateTab('roster')}
                 >
-                  View Roster &amp; Build Priorities
+                  Roster &amp; Artifacts
                   <ArrowUpRight size={13} />
                 </button>
               </div>

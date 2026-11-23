@@ -947,9 +947,10 @@ button {
   flex-direction: column;
 }
 
-.region-row {
+.region-row,
+.boss-row {
   display: grid;
-  grid-template-columns: minmax(250px, 1.3fr) auto auto;
+  grid-template-columns: minmax(250px, 1.35fr) auto auto;
   align-items: center;
   gap: 28px;
   padding: 18px 10px;
@@ -957,7 +958,8 @@ button {
   transition: background-color 0.14s ease;
 }
 
-.region-row:hover {
+.region-row:hover,
+.boss-row:hover {
   background: var(--bg-subtle);
 }
 
@@ -1344,6 +1346,7 @@ button {
     border-top: 1px solid var(--hairline);
   }
   .region-row,
+  .boss-row,
   .focus-build-row {
     grid-template-columns: 1fr;
     gap: 12px;

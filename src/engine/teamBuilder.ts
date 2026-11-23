@@ -402,39 +402,124 @@ export function generateRecommendedTeams(
             }
           }
 
-          // Encounter-specific scoring
+          // Encounter / Boss-specific scoring
           if (encounter) {
+            // Strictly penalize immune/disadvantaged elements (e.g. Pyro vs Emperor, Hydro vs Tulpa, Electro vs Thunder Manifestation)
             if (encounter.avoidElements) {
               const badCount = combo.filter((c) =>
                 encounter.avoidElements!.includes(c.element)
               ).length;
-              rankScore -= badCount * 45;
+              if (badCount > 0) {
+                rankScore -= badCount * 140;
+              }
             }
+
+            // Require an actual Healer when boss mechanics demand healing (e.g. Moongecko cocoon, The Knave Bond of Life)
+            if (encounter.requiresHealer && !analysis.hasHealer) {
+              rankScore -= 80;
+            }
+
+            // Reward matching the boss's single best counter archetype (never double-dip!)
+            const prefArch = encounter.preferredArchetypes;
+            const archBonuses: number[] = [0];
+            if (
+              prefArch.includes('stellar-conduct') &&
+              analysis.stellarState === 'Stellar-Conduct Active'
+            ) {
+              archBonuses.push(prefArch[0] === 'stellar-conduct' ? 48 : 30);
+            }
+            if (
+              prefArch.includes('stellar-swirl') &&
+              analysis.stellarState === 'Stellar Swirl Active'
+            ) {
+              archBonuses.push(prefArch[0] === 'stellar-swirl' ? 48 : 30);
+            }
+            if (
+              prefArch.includes('lunar-charged') &&
+              analysis.reactions.some((r) => r.name === 'Lunar-Charged')
+            ) {
+              archBonuses.push(prefArch[0] === 'lunar-charged' ? 46 : 28);
+            }
+            if (
+              prefArch.includes('lunar-bloom') &&
+              analysis.reactions.some((r) => r.name === 'Lunar-Bloom')
+            ) {
+              archBonuses.push(prefArch[0] === 'lunar-bloom' ? 46 : 28);
+            }
+            if (
+              prefArch.includes('lunar-crystallize') &&
+              analysis.reactions.some((r) => r.name === 'Lunar-Crystallize')
+            ) {
+              archBonuses.push(prefArch[0] === 'lunar-crystallize' ? 50 : 28);
+            }
+            if (
+              prefArch.includes('melt-cryo-pyro') &&
+              analysis.reactions.some((r) => r.name === 'Melt')
+            ) {
+              archBonuses.push(prefArch[0] === 'melt-cryo-pyro' ? 40 : 24);
+            }
+            rankScore += Math.max(...archBonuses);
+
             const prefMatches = new Set(
               combo
                 .map((c) => c.element)
                 .filter((el) => encounter.preferredElements.includes(el))
             ).size;
-            rankScore += prefMatches * 10;
+            rankScore += prefMatches * 9;
 
             if (
               encounter.requiredTags?.some((tag) =>
                 combo.some((c) => c.mechanicTags.includes(tag))
               )
             ) {
-              rankScore += 26;
+              rankScore += 28;
+            }
+
+            // Boss-specific mechanic checks
+            if (encounter.id === 'wavebinder') {
+              if (combo.some((c) => c.element === 'Electro')) rankScore += 18;
+              if (analysis.stellarState === 'Stellar-Conduct Active') {
+                rankScore += 24;
+              }
             }
             if (
-              encounter.id === 'nod-krai-ascendant' &&
-              analysis.moonsignTier === 'Ascendant Gleam'
+              encounter.id === 'emperor-of-fire-and-iron' &&
+              combo.some((c) => c.element === 'Hydro')
             ) {
               rankScore += 28;
             }
             if (
-              encounter.id === 'geo-golem-shields' &&
-              combo.some((c) => c.element === 'Geo' || c.weapon === 'Claymore')
+              (encounter.id === 'radiant-moongecko' ||
+                encounter.id === 'legatus-golem') &&
+              combo.filter((c) => c.element === 'Geo').length >= 2
             ) {
-              rankScore += 22;
+              rankScore += 26;
+            }
+            if (
+              encounter.id === 'overseer-device' &&
+              combo.filter((c) => c.element === 'Cryo').length >= 2
+            ) {
+              rankScore += 24;
+            }
+            if (
+              encounter.id === 'azhdaha-weekly' &&
+              analysis.hasShielder
+            ) {
+              rankScore += 24;
+            }
+            if (
+              encounter.id === 'raiden-weekly' &&
+              combo.some((c) => c.element === 'Electro')
+            ) {
+              rankScore += 24;
+            }
+            if (
+              (encounter.id === 'knuckle-duckle' ||
+                encounter.id === 'radiant-moonfly' ||
+                encounter.id === 'frostnight-herra') &&
+              analysis.moonsignTier === 'Ascendant Gleam'
+            ) {
+              rankScore += 24;
             }
           }
 

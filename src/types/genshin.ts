@@ -75,13 +75,16 @@ export interface EncounterDefinition {
   id: string;
   name: string;
   region: string;
-  category: 'Boss' | 'Shield & Mechanic' | 'Abyss / Domain' | 'Exploration';
+  category: 'World Boss' | 'Weekly Boss' | 'Stygian Onslaught' | 'Shield & Mechanic' | 'Abyss / Domain';
   summary: string;
   tacticalTip: string;
   preferredArchetypes: string[];
   preferredElements: ElementType[];
   avoidElements?: ElementType[];
   requiredTags?: MechanicTag[];
+  requiresHealer?: boolean;
+  dropsFor?: string[];
+  isStygian72?: boolean;
   keywords: string[];
   matchedPresetRegion?: string;
 }
@@ -182,4 +185,4 @@ export interface AppSettings {
   dataSource: 'snapshot' | 'live-sheets';
 }
 
-export type ActiveTab = 'visualizer' | 'abyss' | 'regions' | 'roster' | 'saved';
+export type ActiveTab = 'visualizer' | 'bosses' | 'abyss' | 'regions' | 'roster' | 'saved';

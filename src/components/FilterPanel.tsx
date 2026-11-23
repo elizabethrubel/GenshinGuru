@@ -207,10 +207,10 @@ export function FilterPanel({
             })
           }
         >
-          <option value="">Encounter…</option>
+          <option value="">Boss / Encounter…</option>
           {ENCOUNTERS.map((enc) => (
             <option key={enc.id} value={enc.id}>
-              {enc.name.split('/')[0].trim()}
+              {enc.name}
             </option>
           ))}
         </select>

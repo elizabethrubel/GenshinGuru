@@ -9,6 +9,7 @@ import type {
   AppSettings,
   BuilderFilters,
   Character,
+  EncounterDefinition,
   RegionalPreset,
   SavedAbyssPair,
   SavedTeam,
@@ -40,6 +41,7 @@ import {
 import { Header } from './components/Header';
 import { FilterPanel } from './components/FilterPanel';
 import { TeamVisualizer } from './components/TeamVisualizer';
+import { BossesView } from './components/BossesView';
 import { AbyssPlanner } from './components/AbyssPlanner';
 import { RegionalPresets } from './components/RegionalPresets';
 import { RosterView } from './components/RosterView';
@@ -509,6 +511,36 @@ export default function App() {
               onNavigateTab={(tab) => setActiveTab(tab)}
             />
           </>
+        )}
+
+        {activeTab === 'bosses' && (
+          <BossesView
+            roster={roster}
+            includeUnbuilt={filters.includeUnbuilt}
+            onToggleIncludeUnbuilt={() =>
+              setFilters((prev) => ({
+                ...prev,
+                includeUnbuilt: !prev.includeUnbuilt,
+              }))
+            }
+            onOpenBossInCircle={(
+              boss: EncounterDefinition,
+              rec: TeamRecommendation
+            ) => {
+              setSelectedRegionId(null);
+              setFilters((prev) => ({
+                ...prev,
+                archetypeId: null,
+                encounterId: boss.id,
+                anchorCharacterId: null,
+              }));
+              setManualSlots(rec.members);
+              setManualTeam(null);
+              setSelectedRecId(rec.id);
+              setActiveTab('visualizer');
+            }}
+            onSendToAbyss={handleSendToAbyss}
+          />
         )}
 
         {activeTab === 'abyss' && (
