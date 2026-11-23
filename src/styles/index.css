@@ -652,19 +652,28 @@ button {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    padding: 16px 14px 28px 4px;
+    padding: 16px 14px 36px 4px;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 calc(100% - 32px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      #000 0%,
+      #000 calc(100% - 32px),
+      transparent 100%
+    );
   }
 
   .app-shell[data-tab='visualizer'] .editorial-footer {
+    position: static;
     flex-shrink: 0;
-    padding: 14px 4px 6px;
+    padding: 12px 4px 6px;
     border-top: 1px solid var(--hairline);
-    background: linear-gradient(
-      180deg,
-      rgba(16, 21, 38, 0.35) 0%,
-      rgba(16, 21, 38, 0.88) 40%
-    );
-    backdrop-filter: blur(10px);
+    background: transparent;
+    backdrop-filter: none;
   }
 }
 
@@ -1015,13 +1024,9 @@ button {
 }
 
 .editorial-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 15;
   padding: 12px 0;
   border-top: 1px solid var(--hairline);
-  background: rgba(16, 21, 38, 0.9);
-  backdrop-filter: blur(12px);
+  background: transparent;
 }
 
 .editorial-empty-center {

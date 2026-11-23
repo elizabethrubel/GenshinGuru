@@ -4,9 +4,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Bookmark,
-  ClipboardCopy,
   Shuffle,
-  Swords,
 } from 'lucide-react';
 import type {
   ActiveTab,
@@ -71,8 +69,6 @@ export function TeamVisualizer({
   roster,
   includeUnbuilt,
   onSaveTeam,
-  onCopySheetRow,
-  onSendToAbyss,
   onNavigateTab,
 }: TeamVisualizerProps) {
   const [swappingSlot, setSwappingSlot] = useState<number | null>(null);
@@ -562,7 +558,7 @@ export function TeamVisualizer({
           )}
           </div>
 
-          {/* Pinned Sticky Action Footer — always visible above the fold */}
+          {/* Clean Transparent Action Footer — always visible above the fold */}
           {!isEmptyLanding && !isNoFilterMatch && effectiveTeam && (
             <div className="editorial-footer">
               <div className="editorial-actions">
@@ -603,31 +599,6 @@ export function TeamVisualizer({
                       Fate&apos;s Pick
                     </>
                   )}
-                </button>
-                <button
-                  id="btn-copy-sheet-row"
-                  type="button"
-                  className="btn-subtle"
-                  onClick={() => onCopySheetRow(effectiveTeam)}
-                >
-                  <ClipboardCopy size={13} />
-                  Copy Row
-                </button>
-                <button
-                  type="button"
-                  className="ghost-action"
-                  onClick={() => onSendToAbyss(effectiveTeam, 1)}
-                >
-                  <Swords size={13} />
-                  Abyss 1
-                </button>
-                <button
-                  type="button"
-                  className="ghost-action"
-                  onClick={() => onSendToAbyss(effectiveTeam, 2)}
-                >
-                  <Swords size={13} />
-                  Abyss 2
                 </button>
               </div>
             </div>
