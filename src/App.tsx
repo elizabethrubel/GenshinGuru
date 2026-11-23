@@ -25,6 +25,7 @@ import {
 import {
   formatTeamAsSheetRow,
   generateRecommendedTeams,
+  type TeamRankingMode,
 } from './engine/teamBuilder';
 import {
   fetchRosterFromSheets,
@@ -112,6 +113,8 @@ export default function App() {
   const [topTeamsSearch, setTopTeamsSearch] = useState('');
   const [topTeamsCategory, setTopTeamsCategory] =
     useState<TopTeamsCategory>('All');
+  const [topTeamsSortBy, setTopTeamsSortBy] =
+    useState<TeamRankingMode>('ready-now');
   const [bossSearch, setBossSearch] = useState('');
   const [bossFilterKey, setBossFilterKey] = useState<BossFilterKey>('All');
   const [regionSearch, setRegionSearch] = useState('');
@@ -803,6 +806,8 @@ export default function App() {
             roster={roster}
             includeUnbuilt={filters.includeUnbuilt}
             requireSurvivability={filters.requireSurvivability}
+            sortBy={topTeamsSortBy}
+            onChangeSortBy={setTopTeamsSortBy}
             search={topTeamsSearch}
             onChangeSearch={setTopTeamsSearch}
             category={topTeamsCategory}

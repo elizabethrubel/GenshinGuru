@@ -11,6 +11,7 @@ import {
   analyzeTeam,
   BATTLE_READY_LEVEL,
   computeRawTeamPower,
+  computeTeamReadinessMultiplier,
   inferSlotRoles,
 } from './teamAnalyzer';
 
@@ -719,10 +720,17 @@ export function getSlotSubstitutes(
   return subs;
 }
 
+export type TeamRankingMode = 'ready-now' | 'max-potential';
+
 export interface RankedStrongestTeam {
   rank: number;
   team: TeamRecommendation;
-  compatibilityScore: number;
+  /** Ready-Now level-weighted score (0-100) */
+  readyScore: number;
+  /** Pure kit & reaction compatibility ceiling assuming Lv 90 (0-100) */
+  potentialScore: number;
+  /** Active score for the selected ranking mode */
+  activeScore: number;
   rawPower: number;
   category: 'Lunar' | 'Stellar' | 'Melt / Vape' | 'Overloaded' | 'Hyperbloom' | 'Elemental';
 }
@@ -756,17 +764,23 @@ function classifyTeamCategory(
 
 /**
  * Computes the user's strongest distinct teams across their roster,
- * strictly ordered by compatibility score (and tie-broken by meta power).
+ * ordered either by Ready-Now (level-weighted) or Max Potential (kit compatibility).
  */
 export function generateRankedStrongestTeams(
   roster: Character[],
   options: {
     includeUnbuilt: boolean;
     requireSurvivability: boolean;
+    sortBy?: TeamRankingMode;
     maxResults?: number;
   }
 ): RankedStrongestTeam[] {
-  const { includeUnbuilt, requireSurvivability, maxResults = 16 } = options;
+  const {
+    includeUnbuilt,
+    requireSurvivability,
+    sortBy = 'ready-now',
+    maxResults = 16,
+  } = options;
 
   const baseFilters: BuilderFilters = {
     archetypeId: null,
@@ -794,7 +808,19 @@ export function generateRankedStrongestTeams(
   // 1. Broad top general combinations
   register(generateRecommendedTeams(roster, baseFilters, 8));
 
-  // 2. Top 2 builds per reaction archetype so every viable playstyle is represented
+  // 2. When viewing Lv 1-90 in Ready Now mode, also seed top Battle-Ready Lv 70+ squads
+  // so high-level squads aren't crowded out of the candidate pool by unbuilt ceiling picks
+  if (includeUnbuilt) {
+    register(
+      generateRecommendedTeams(
+        roster,
+        { ...baseFilters, includeUnbuilt: false },
+        6
+      )
+    );
+  }
+
+  // 3. Top 2 builds per reaction archetype so every viable playstyle is represented
   for (const arch of ARCHETYPES) {
     register(
       generateRecommendedTeams(
@@ -805,11 +831,11 @@ export function generateRankedStrongestTeams(
     );
   }
 
-  // Score every unique team with unclamped raw power for fair tie-breaking
+  // Score every unique team for both Ready-Now and Max-Potential sorting
   const scored = Array.from(uniqueMap.values()).map((team) => {
     const a = team.analysis;
     const healerCount = team.members.filter((m) => m.isHealer).length;
-    const rawPower = computeRawTeamPower(team.members, {
+    const rawKitPower = computeRawTeamPower(team.members, {
       lunarChargedActive: a.reactions.some((r) => r.name === 'Lunar-Charged'),
       lunarBloomActive: a.reactions.some((r) => r.name === 'Lunar-Bloom'),
       lunarCrystallizeActive: a.reactions.some(
@@ -823,18 +849,22 @@ export function generateRankedStrongestTeams(
       reactions: a.reactions,
       resonances: a.resonances,
     });
+    const readyPower = rawKitPower * computeTeamReadinessMultiplier(team.members);
+
     return {
       team,
-      compatibilityScore: a.score,
-      rawPower,
+      readyScore: a.score,
+      potentialScore: a.potentialScore,
+      activeScore: sortBy === 'ready-now' ? a.score : a.potentialScore,
+      rawPower: sortBy === 'ready-now' ? readyPower : rawKitPower,
       category: classifyTeamCategory(team),
     };
   });
 
-  // Sort strictly descending by compatibility score, then unclamped power
+  // Sort strictly descending by active score, then unclamped power
   scored.sort((a, b) => {
-    if (b.compatibilityScore !== a.compatibilityScore) {
-      return b.compatibilityScore - a.compatibilityScore;
+    if (b.activeScore !== a.activeScore) {
+      return b.activeScore - a.activeScore;
     }
     return b.rawPower - a.rawPower;
   });
@@ -853,7 +883,9 @@ export function generateRankedStrongestTeams(
     selected.push({
       rank: selected.length + 1,
       team: item.team,
-      compatibilityScore: item.compatibilityScore,
+      readyScore: item.readyScore,
+      potentialScore: item.potentialScore,
+      activeScore: item.activeScore,
       rawPower: item.rawPower,
       category: item.category,
     });

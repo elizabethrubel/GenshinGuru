@@ -387,12 +387,28 @@ export function computeRawTeamPower(
     }
   }
 
-  // 6. Resonance & level readiness
+  // 6. Resonance bonus (pure kit synergy, independent of current level)
   power += Math.min(meta.resonances.length * 4, 8);
-  const avgLevel = valid.reduce((s, c) => s + c.level, 0) / valid.length;
-  power += (avgLevel / 90) * 14;
 
   return power;
+}
+
+/** Smooth per-character combat readiness factor based on actual Genshin level scaling */
+function charLevelReadiness(level: number): number {
+  if (level >= 90) return 1.0;
+  if (level >= 80) return 0.95 + ((level - 80) / 10) * 0.05;
+  if (level >= 70) return 0.89 + ((level - 70) / 10) * 0.06;
+  if (level >= 40) return 0.56 + ((level - 40) / 30) * 0.33;
+  return 0.26 + (Math.max(1, level) - 1) / 39 * 0.3;
+}
+
+export function computeTeamReadinessMultiplier(valid: Character[]): number {
+  if (valid.length === 0) return 0;
+  const factors = valid.map((c) => charLevelReadiness(c.level));
+  const avg = factors.reduce((s, f) => s + f, 0) / factors.length;
+  const min = Math.min(...factors);
+  // 82% average readiness + 18% weakest-link floor so a Lv 1 teammate visibly lowers Ready-Now score
+  return 0.82 * avg + 0.18 * min;
 }
 
 export function analyzeTeam(members: Character[]): TeamAnalysis {
@@ -855,7 +871,7 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
       reason: `Currently Lv ${c.level} — level to 70/80+ for Spiral Abyss & endgame comfort.`,
     }));
 
-  // Calibrated meta power -> realistic 35..98 displayed score without artificial 98 ties
+  // Calibrated pure kit power -> realistic 25..98 Max Potential compatibility score
   const rawPower = computeRawTeamPower(valid, {
     lunarChargedActive,
     lunarBloomActive,
@@ -869,14 +885,28 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
     resonances,
   });
 
-  // Map rawPower ~ [85..245] smoothly to [40..98]
-  const calibrated = Math.round(40 + ((rawPower - 85) / 160) * 58);
-  const clampedScore = Math.max(25, Math.min(98, calibrated));
+  // Map rawPower ~ [80..235] smoothly to [35..98] for pure kit ceiling
+  const calibratedPotential = Math.round(35 + ((rawPower - 80) / 155) * 63);
+  const potentialScore =
+    valid.length === 0 ? 0 : Math.max(25, Math.min(98, calibratedPotential));
+
+  // Apply real Genshin level-readiness multiplier for the Ready-Now score
+  const readiness = computeTeamReadinessMultiplier(valid);
+  const readyScore =
+    valid.length === 0
+      ? 0
+      : Math.max(15, Math.min(98, Math.round(potentialScore * readiness)));
+
   const minLevel =
     valid.length > 0 ? Math.min(...valid.map((c) => c.level)) : 0;
+  const avgLevel =
+    valid.length > 0
+      ? Math.round(valid.reduce((s, c) => s + c.level, 0) / valid.length)
+      : 0;
 
   return {
-    score: clampedScore,
+    score: readyScore,
+    potentialScore,
     reactions,
     resonances,
     moonsignTotal,
@@ -892,5 +922,6 @@ export function analyzeTeam(members: Character[]): TeamAnalysis {
     levelingCallouts,
     allBattleReady: minLevel >= BATTLE_READY_LEVEL,
     minLevel,
+    avgLevel,
   };
 }

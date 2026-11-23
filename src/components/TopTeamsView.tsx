@@ -4,7 +4,9 @@ import type { Character, TeamRecommendation } from '../types/genshin';
 import {
   generateRankedStrongestTeams,
   type RankedStrongestTeam,
+  type TeamRankingMode,
 } from '../engine/teamBuilder';
+import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
 import { CharacterPortrait } from './CharacterPortrait';
 import { PrimogemStar } from './NationEmblem';
 
@@ -20,6 +22,8 @@ interface TopTeamsViewProps {
   roster: Character[];
   includeUnbuilt: boolean;
   requireSurvivability: boolean;
+  sortBy: TeamRankingMode;
+  onChangeSortBy: (mode: TeamRankingMode) => void;
   search: string;
   onChangeSearch: (q: string) => void;
   category: TopTeamsCategory;
@@ -55,6 +59,8 @@ export function TopTeamsView({
   roster,
   includeUnbuilt,
   requireSurvivability,
+  sortBy,
+  onChangeSortBy,
   search,
   onChangeSearch,
   category,
@@ -68,9 +74,10 @@ export function TopTeamsView({
       generateRankedStrongestTeams(roster, {
         includeUnbuilt,
         requireSurvivability,
+        sortBy,
         maxResults: 18,
       }),
-    [roster, includeUnbuilt, requireSurvivability]
+    [roster, includeUnbuilt, requireSurvivability, sortBy]
   );
 
   const filtered = useMemo(() => {
@@ -99,21 +106,58 @@ export function TopTeamsView({
             Strongest Teams by Compatibility
           </h2>
           <p className="editorial-prose" style={{ marginTop: 4 }}>
-            Your highest-scoring squads computed live from your{' '}
-            <strong>{includeUnbuilt ? 'Lv 1–90' : 'Lv 70+'}</strong> pool,
-            ordered from highest compatibility score down.
+            {sortBy === 'ready-now'
+              ? 'Ranked by current combat strength — weighting both kit synergy and your characters’ actual levels.'
+              : 'Ranked by max kit compatibility — showing each squad’s ceiling once every character is leveled.'}
           </p>
         </div>
 
-        <div className="command-search-wrap" style={{ maxWidth: 290 }}>
-          <Search size={14} className="command-search-icon" />
-          <input
-            type="text"
-            className="command-input"
-            value={search}
-            onChange={(e) => onChangeSearch(e.target.value)}
-            placeholder="Filter by character, element, or reaction…"
-          />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Ready Now vs Max Potential Segmented Switch */}
+          <div
+            className="mode-segmented"
+            role="tablist"
+            aria-label="Team score sorting mode"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sortBy === 'ready-now'}
+              className={`mode-seg-btn ${sortBy === 'ready-now' ? 'active' : ''}`}
+              onClick={() => onChangeSortBy('ready-now')}
+              title="Weights current character levels heavily so your Lv 80-90 squads rank highest"
+            >
+              Ready Now
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sortBy === 'max-potential'}
+              className={`mode-seg-btn ${sortBy === 'max-potential' ? 'active' : ''}`}
+              onClick={() => onChangeSortBy('max-potential')}
+              title="Pure kit and reaction compatibility ceiling assuming all teammates are leveled"
+            >
+              Max Potential
+            </button>
+          </div>
+
+          <div className="command-search-wrap" style={{ maxWidth: 260 }}>
+            <Search size={14} className="command-search-icon" />
+            <input
+              type="text"
+              className="command-input"
+              value={search}
+              onChange={(e) => onChangeSearch(e.target.value)}
+              placeholder="Filter by character or reaction…"
+            />
+          </div>
         </div>
       </div>
 
@@ -139,7 +183,14 @@ export function TopTeamsView({
 
       <div className="region-list">
         {filtered.map((entry) => {
-          const { rank, team, compatibilityScore, category: teamCat } = entry;
+          const {
+            rank,
+            team,
+            readyScore,
+            potentialScore,
+            activeScore,
+            category: teamCat,
+          } = entry;
           const accent = CATEGORY_ACCENT[teamCat] ?? 'var(--gold)';
           const isTopThree = rank <= 3;
           const sustainNames = team.members
@@ -155,9 +206,11 @@ export function TopTeamsView({
                 ? 'Chevreuse Shred'
                 : teamCat;
 
+          const needsLeveling = readyScore < potentialScore - 8;
+
           return (
             <div key={team.id} className="ranked-team-row">
-              {/* Left: Rank + Compatibility Score Meter */}
+              {/* Left: Rank + Active Score Meter + Secondary Potential/Ready Cue */}
               <div className="rank-score-col">
                 <div className={`rank-badge ${isTopThree ? 'top' : ''}`}>
                   {isTopThree && (
@@ -167,17 +220,36 @@ export function TopTeamsView({
                 </div>
                 <div className="score-block">
                   <div className="score-numeral">
-                    {compatibilityScore}
+                    {activeScore}
                     <span className="score-denom">/100</span>
                   </div>
                   <div className="score-bar-track" aria-hidden="true">
                     <div
                       className="score-bar-fill"
                       style={{
-                        width: `${Math.max(12, Math.min(100, compatibilityScore))}%`,
+                        width: `${Math.max(12, Math.min(100, activeScore))}%`,
                         backgroundColor: accent,
                       }}
                     />
+                  </div>
+                  <div className="score-sub-meta">
+                    {sortBy === 'ready-now' ? (
+                      potentialScore > readyScore + 1 ? (
+                        <span>
+                          Max {potentialScore} · Avg Lv {team.analysis.avgLevel}
+                        </span>
+                      ) : (
+                        <span>Avg Lv {team.analysis.avgLevel}</span>
+                      )
+                    ) : (
+                      <span
+                        style={{
+                          color: needsLeveling ? 'var(--warn)' : undefined,
+                        }}
+                      >
+                        Ready {readyScore} · Avg Lv {team.analysis.avgLevel}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -186,10 +258,7 @@ export function TopTeamsView({
               <div className="ranked-team-meta">
                 <div className="region-focal-name">
                   <span>{team.title}</span>
-                  <span
-                    className="region-parent-tag"
-                    style={{ color: accent }}
-                  >
+                  <span className="region-parent-tag" style={{ color: accent }}>
                     {highlightMode}
                   </span>
                 </div>
@@ -207,20 +276,28 @@ export function TopTeamsView({
                 </div>
               </div>
 
-              {/* Center-Right: 4 Clickable Character Portraits */}
+              {/* Center-Right: 4 Clickable Character Portraits with Level Readout */}
               <div className="region-portraits">
-                {team.members.map((m, idx) => (
-                  <button
-                    key={`${m.id}-${idx}`}
-                    type="button"
-                    className="region-portrait-item clickable-portrait"
-                    onClick={() => onInspectCharacter(m)}
-                    title={`Inspect ${m.name}'s ideal artifacts & build`}
-                  >
-                    <CharacterPortrait character={m} size={48} />
-                    <span className="region-portrait-name">{m.name}</span>
-                  </button>
-                ))}
+                {team.members.map((m, idx) => {
+                  const isUnbuilt = m.level < BATTLE_READY_LEVEL;
+                  return (
+                    <button
+                      key={`${m.id}-${idx}`}
+                      type="button"
+                      className="region-portrait-item clickable-portrait"
+                      onClick={() => onInspectCharacter(m)}
+                      title={`Inspect ${m.name} (Lv ${m.level}) ideal artifacts & build`}
+                    >
+                      <CharacterPortrait character={m} size={48} />
+                      <span className="region-portrait-name">{m.name}</span>
+                      <span
+                        className={`portrait-lv-sub ${isUnbuilt ? 'unbuilt' : ''}`}
+                      >
+                        Lv {m.level}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Right: Open Circle + Abyss Queue Actions */}

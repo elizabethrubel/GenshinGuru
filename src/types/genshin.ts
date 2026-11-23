@@ -118,7 +118,10 @@ export interface LevelingCallout {
 }
 
 export interface TeamAnalysis {
+  /** Level-weighted combat readiness & compatibility score (reflects current character levels) */
   score: number;
+  /** Pure kit & reaction compatibility ceiling assuming characters are fully leveled */
+  potentialScore: number;
   reactions: ReactionSummary[];
   resonances: ResonanceInfo[];
   moonsignTotal: number;
@@ -134,6 +137,7 @@ export interface TeamAnalysis {
   levelingCallouts: LevelingCallout[];
   allBattleReady: boolean;
   minLevel: number;
+  avgLevel: number;
 }
 
 export interface TeamRecommendation {

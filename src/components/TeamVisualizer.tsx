@@ -323,7 +323,9 @@ export function TeamVisualizer({
                 </h2>
                 <div className="meta-line">
                   <span style={{ color: 'var(--gold-bright)', fontWeight: 600 }}>
-                    Synergy {liveAnalysis.score}
+                    {liveAnalysis.potentialScore > liveAnalysis.score + 3
+                      ? `Ready ${liveAnalysis.score} (Max ${liveAnalysis.potentialScore})`
+                      : `Compatibility ${liveAnalysis.score}`}
                   </span>
                   {liveAnalysis.moonsignTotal > 0 && (
                     <>
