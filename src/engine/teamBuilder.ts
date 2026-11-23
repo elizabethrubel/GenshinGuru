@@ -894,6 +894,232 @@ export function generateRankedStrongestTeams(
   return selected;
 }
 
+interface RegionExplorationProfile {
+  label: string;
+  preferredElements: Character['element'][];
+  requiredElement?: Character['element'];
+  preferAnemo?: boolean;
+  preferGeo?: boolean;
+  preferMoonsign?: boolean;
+  preferStellar?: boolean;
+  preferDendro?: boolean;
+  tip: string;
+}
+
+function getRegionProfile(regionName: string): RegionExplorationProfile {
+  const r = regionName.toLowerCase();
+  if (r.includes('dragonspine')) {
+    return {
+      label: 'Dragonspine',
+      preferredElements: ['Pyro', 'Cryo', 'Anemo', 'Electro'],
+      requiredElement: 'Pyro',
+      tip: 'Pyro lights braziers to clear Sheer Cold and melts Frostarm shields, backed by steady healing.',
+    };
+  }
+  if (r.includes('temple of space')) {
+    return {
+      label: 'Temple of Space',
+      preferredElements: ['Electro', 'Hydro', 'Anemo', 'Pyro'],
+      preferAnemo: true,
+      tip: 'Fast AoE elemental reactions and Anemo grouping clear spatial domain waves smoothly.',
+    };
+  }
+  if (r.includes('mondstadt')) {
+    return {
+      label: 'Mondstadt',
+      preferredElements: ['Anemo', 'Pyro', 'Electro', 'Cryo'],
+      preferAnemo: true,
+      tip: 'Anemo activates wind pinwheels & shreds RES while Pyro/Electro/Cryo handle torches, Cryo slimes, and Abyss Mages.',
+    };
+  }
+  if (r.includes('chasm') || r.includes('bygone')) {
+    return {
+      label: r.includes('chasm') ? 'The Chasm' : 'Sea of Bygone Eras',
+      preferredElements: ['Geo', 'Hydro', 'Electro'],
+      preferGeo: true,
+      tip: 'Geo shatters bedrock, Golem shields, and pressure plates while Lunar-Crystallize keeps DPS high.',
+    };
+  }
+  if (r.includes('chenyu') || r.includes('sumeru')) {
+    return {
+      label: r.includes('chenyu') ? 'Chenyu Vale' : 'Sumeru',
+      preferredElements: ['Dendro', 'Hydro', 'Electro', 'Anemo'],
+      preferDendro: true,
+      tip: 'Dendro + Electro/Hydro powers Tri-Lakshana puzzles and high-uptime Lunar-Bloom / Hyperbloom.',
+    };
+  }
+  if (r.includes('liyue')) {
+    return {
+      label: 'Liyue',
+      preferredElements: ['Geo', 'Electro', 'Hydro', 'Pyro'],
+      preferGeo: true,
+      tip: 'Geo resonance & shields break ore and Geo constructs cleanly while keeping overworld exploration effortless.',
+    };
+  }
+  if (r.includes('enkanomiya') || r.includes('inazuma')) {
+    return {
+      label: r.includes('enkanomiya') ? 'Enkanomiya' : 'Inazuma',
+      preferredElements: ['Electro', 'Hydro', 'Cryo', 'Anemo'],
+      tip: 'Electro + Hydro/Cryo clears Bathysmal Vishaps, Abyss Lectors, and lightning relay puzzles rapidly.',
+    };
+  }
+  if (r.includes('fontaine')) {
+    return {
+      label: 'Fontaine',
+      preferredElements: ['Hydro', 'Electro', 'Dendro', 'Anemo'],
+      tip: 'Hydro + Lunar reactions and Arkhe coverage breeze through Clockwork Meka and underwater-adjacent fights.',
+    };
+  }
+  if (r.includes('sacred mountain') || r.includes('natlan')) {
+    return {
+      label: r.includes('sacred') ? 'Ancient Sacred Mountain' : 'Natlan',
+      preferredElements: ['Pyro', 'Electro', 'Hydro', 'Geo'],
+      tip: 'High-frequency elemental hits and Nightsoul/Pyro pressure burn through Tenebrous Void Wards quickly.',
+    };
+  }
+  if (r.includes('nod-krai') || r.includes('frost moon') || r.includes('hiisi')) {
+    return {
+      label: 'Nod-Krai',
+      preferredElements: ['Electro', 'Hydro', 'Dendro', 'Geo', 'Anemo'],
+      preferMoonsign: true,
+      tip: 'Moonsign Ascendant Gleam unlocks enhanced Lunar-Charged, Lunar-Bloom, and Lunar-Crystallize procs.',
+    };
+  }
+  if (r.includes('snezhnaya')) {
+    return {
+      label: 'Snezhnaya',
+      preferredElements: ['Cryo', 'Electro', 'Anemo', 'Pyro'],
+      preferStellar: true,
+      tip: 'Stellar Glimmer (Stellar-Conduct / Stellar Swirl) counters Snezhnayan Radiance & Valiant mechanics.',
+    };
+  }
+  return {
+    label: regionName,
+    preferredElements: ['Anemo', 'Electro', 'Hydro', 'Pyro'],
+    tip: 'High-compatibility all-purpose overworld & combat squad tailored to your strongest leveled characters.',
+  };
+}
+
+/**
+ * Generates stronger alternative teams tailored specifically to a Region's
+ * exploration & combat profile, strictly ordered by Ready-Now score.
+ */
+export function generateTeamsForRegion(
+  roster: Character[],
+  regionName: string,
+  options: {
+    includeUnbuilt: boolean;
+    requireSurvivability: boolean;
+    excludePresetSig?: string;
+    maxResults?: number;
+  }
+): TeamRecommendation[] {
+  const {
+    includeUnbuilt,
+    requireSurvivability,
+    excludePresetSig,
+    maxResults = 7,
+  } = options;
+  const profile = getRegionProfile(regionName);
+
+  // Pull a rich candidate pool from strongest ranked teams (both Ready Now & archetype variety)
+  const rankedPool = generateRankedStrongestTeams(roster, {
+    includeUnbuilt,
+    requireSurvivability,
+    sortBy: 'ready-now',
+    maxResults: 24,
+  });
+
+  // Also ensure region-preferred archetype builds are represented
+  const extraMap = new Map<string, TeamRecommendation>();
+  const addRec = (rec: TeamRecommendation) => {
+    const sig = rec.members
+      .map((m) => m.id)
+      .slice()
+      .sort()
+      .join('|');
+    if (sig === excludePresetSig) return;
+    if (!extraMap.has(sig)) extraMap.set(sig, rec);
+  };
+
+  rankedPool.forEach((r) => addRec(r.team));
+
+  const baseFilters: BuilderFilters = {
+    archetypeId: null,
+    encounterId: null,
+    anchorCharacterId: null,
+    includeUnbuilt,
+    requireSurvivability,
+    excludedCharacterIds: [],
+  };
+
+  if (profile.preferAnemo) {
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'stellar-swirl' }, 3).forEach(addRec);
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'lunar-charged' }, 3).forEach(addRec);
+  }
+  if (profile.preferGeo) {
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'lunar-crystallize' }, 3).forEach(addRec);
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'nightsoul-geo' }, 2).forEach(addRec);
+  }
+  if (profile.preferDendro) {
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'lunar-bloom' }, 3).forEach(addRec);
+  }
+  if (profile.preferStellar) {
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'stellar-conduct' }, 3).forEach(addRec);
+  }
+  if (profile.requiredElement === 'Pyro') {
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'melt-vape' }, 3).forEach(addRec);
+    generateRecommendedTeams(roster, { ...baseFilters, archetypeId: 'overloaded-chevreuse' }, 2).forEach(addRec);
+  }
+
+  const scored = Array.from(extraMap.values())
+    .filter((team) => {
+      if (
+        profile.requiredElement &&
+        !team.members.some((m) => m.element === profile.requiredElement)
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .map((team) => {
+      const a = team.analysis;
+      let fitBonus = 0;
+
+      const els = new Set(team.members.map((m) => m.element));
+      for (const pref of profile.preferredElements) {
+        if (els.has(pref)) fitBonus += 2.2;
+      }
+      if (profile.preferAnemo && els.has('Anemo')) fitBonus += 4;
+      if (profile.preferGeo && els.has('Geo')) fitBonus += 5;
+      if (profile.preferDendro && els.has('Dendro')) fitBonus += 5;
+      if (profile.preferMoonsign && a.moonsignTier === 'Ascendant Gleam') {
+        fitBonus += 5;
+      }
+      if (profile.preferStellar && a.stellarState.includes('Active')) {
+        fitBonus += 5;
+      }
+
+      // Order primarily by real Ready-Now strength + modest region exploration fit
+      const sortMetric = a.score + fitBonus;
+      return { team, sortMetric };
+    });
+
+  scored.sort((a, b) => {
+    if (b.sortMetric !== a.sortMetric) return b.sortMetric - a.sortMetric;
+    return b.team.analysis.score - a.team.analysis.score;
+  });
+
+  return scored.slice(0, maxResults).map(({ team }) => ({
+    ...team,
+    id: `region-alt-${profile.label.toLowerCase().replace(/\s+/g, '-')}-${team.members
+      .map((m) => m.id)
+      .sort()
+      .join('-')}`,
+    whyItWorks: `${profile.tip} ${team.whyItWorks}`,
+  }));
+}
+
 export function formatTeamAsSheetRow(
   members: Character[],
   teamName: string,

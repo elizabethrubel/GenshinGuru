@@ -25,6 +25,7 @@ import {
 import {
   formatTeamAsSheetRow,
   generateRecommendedTeams,
+  generateTeamsForRegion,
   type TeamRankingMode,
 } from './engine/teamBuilder';
 import {
@@ -278,7 +279,56 @@ export default function App() {
     Boolean(filters.anchorCharacterId) ||
     Boolean(manualTeam);
 
+  const activeRegionPreset = useMemo(
+    () => presets.find((p) => p.id === selectedRegionId) ?? null,
+    [presets, selectedRegionId]
+  );
+
   const recommendations = useMemo(() => {
+    if (activeRegionPreset) {
+      const charMap = new Map(roster.map((c) => [c.id, c]));
+      const presetMembers = activeRegionPreset.resolvedCharacterIds
+        .map((id) => (id ? charMap.get(id) ?? null : null))
+        .filter((c): c is Character => Boolean(c));
+
+      const out: TeamRecommendation[] = [];
+      let excludePresetSig: string | undefined;
+
+      if (presetMembers.length >= 4) {
+        const tuple = presetMembers.slice(0, 4) as [
+          Character,
+          Character,
+          Character,
+          Character,
+        ];
+        excludePresetSig = tuple
+          .map((m) => m.id)
+          .slice()
+          .sort()
+          .join('|');
+        const analysis = analyzeTeam(tuple);
+        out.push({
+          id: `preset-${activeRegionPreset.id}`,
+          title: activeRegionPreset.teamName,
+          subtitle: activeRegionPreset.region,
+          members: tuple,
+          slotLabels: inferSlotRoles(tuple),
+          analysis,
+          whyItWorks: `Your saved "${activeRegionPreset.region}" squad from Party by Region. Use the stronger options or Shuffle below the circle to test higher-scoring upgrades for this region.`,
+          source: 'preset',
+        });
+      }
+
+      const alts = generateTeamsForRegion(roster, activeRegionPreset.region, {
+        includeUnbuilt: filters.includeUnbuilt,
+        requireSurvivability: filters.requireSurvivability,
+        excludePresetSig,
+        maxResults: 7,
+      });
+
+      return [...out, ...alts];
+    }
+
     if (
       !filters.archetypeId &&
       !filters.encounterId &&
@@ -286,8 +336,8 @@ export default function App() {
     ) {
       return [];
     }
-    return generateRecommendedTeams(roster, filters, 6);
-  }, [roster, filters]);
+    return generateRecommendedTeams(roster, filters, 8);
+  }, [activeRegionPreset, roster, filters]);
 
   const activeTeam: TeamRecommendation | null = useMemo(() => {
     if (manualTeam) return manualTeam;
@@ -297,11 +347,6 @@ export default function App() {
     }
     return recommendations[0] ?? null;
   }, [manualTeam, selectedRecId, recommendations]);
-
-  const activeRegionPreset = useMemo(
-    () => presets.find((p) => p.id === selectedRegionId) ?? null,
-    [presets, selectedRegionId]
-  );
 
   const handleChangeFilters = (next: BuilderFilters) => {
     setSelectedRegionId(null);
@@ -314,35 +359,20 @@ export default function App() {
 
   const loadPresetIntoCircle = (
     preset: RegionalPreset,
-    resolvedMembers?: Character[]
+    _resolvedMembers?: Character[],
+    initialAlt?: TeamRecommendation
   ) => {
-    const charMap = new Map(roster.map((c) => [c.id, c]));
-    const members =
-      resolvedMembers ??
-      preset.resolvedCharacterIds
-        .map((id) => (id ? charMap.get(id) ?? null : null))
-        .filter((c): c is Character => Boolean(c));
-
-    if (members.length < 4) return;
-    const tuple = members.slice(0, 4) as [
-      Character,
-      Character,
-      Character,
-      Character,
-    ];
-    const analysis = analyzeTeam(tuple);
     setSelectedRegionId(preset.id);
-    setManualSlots(tuple);
-    setManualTeam({
-      id: `preset-${preset.id}`,
-      title: preset.teamName,
-      subtitle: preset.region,
-      members: tuple,
-      slotLabels: inferSlotRoles(tuple),
-      analysis,
-      whyItWorks: `Your go-to "${preset.region}" squad from Party by Region. Hover any connection inside the circle to inspect reactions, or click a portrait to test substitutes.`,
-      source: 'preset',
-    });
+    setFilters((prev) => ({
+      ...prev,
+      archetypeId: null,
+      encounterId: null,
+      anchorCharacterId: null,
+    }));
+    setManualTeam(null);
+    setManualSlots(EMPTY_SLOTS);
+    setSelectedRecId(initialAlt ? initialAlt.id : `preset-${preset.id}`);
+    setFatesBurstKey((k) => k + 1);
   };
 
   const handleSelectRegionDropdown = (presetId: string | null) => {
@@ -350,12 +380,36 @@ export default function App() {
       setSelectedRegionId(null);
       setManualTeam(null);
       setManualSlots(EMPTY_SLOTS);
+      setSelectedRecId(null);
       return;
     }
     const preset = presets.find((p) => p.id === presetId);
     if (preset) {
       loadPresetIntoCircle(preset);
     }
+  };
+
+  // Context-aware shuffle: cycles through strong alternatives within the current Region/Boss/Filter
+  const handleShuffleTeam = () => {
+    if (recommendations.length > 1) {
+      const currentIdx = recommendations.findIndex(
+        (r) => r.id === activeTeam?.id
+      );
+      const nextIdx =
+        currentIdx === -1 ? 1 : (currentIdx + 1) % recommendations.length;
+      const next = recommendations[nextIdx];
+      setManualTeam(null);
+      setManualSlots(next.members);
+      setSelectedRecId(next.id);
+      setFatesBurstKey((k) => k + 1);
+      const label =
+        next.source === 'preset'
+          ? `Returned to Sheet Preset (Score ${next.analysis.score})`
+          : `Shuffled to ${next.title} (Score ${next.analysis.score})`;
+      notify(label);
+      return;
+    }
+    handleFatesPick();
   };
 
   const handleSwapSlot = (slotIndex: number, nextChar: Character) => {
@@ -527,9 +581,10 @@ export default function App() {
 
   const handleLoadPresetToVisualizer = (
     preset: RegionalPreset,
-    members: Character[]
+    members: Character[],
+    initialAlt?: TeamRecommendation
   ) => {
-    loadPresetIntoCircle(preset, members);
+    loadPresetIntoCircle(preset, members, initialAlt);
     setOriginContext({
       fromTab: 'regions',
       label: 'Regions',
@@ -772,11 +827,11 @@ export default function App() {
               }}
               burstSignal={fatesBurstKey}
               onSelectRecommendation={(rec) => {
-                setSelectedRegionId(null);
                 setManualTeam(null);
                 setManualSlots(rec.members);
                 setSelectedRecId(rec.id);
               }}
+              onShuffleTeam={handleShuffleTeam}
               onSwapSlot={handleSwapSlot}
               onInspectCharacter={(char) => setInspectedCharacter(char)}
               onFatesPick={() => {
@@ -899,6 +954,8 @@ export default function App() {
           <RegionalPresets
             presets={presets}
             roster={roster}
+            includeUnbuilt={filters.includeUnbuilt}
+            requireSurvivability={filters.requireSurvivability}
             search={regionSearch}
             onChangeSearch={setRegionSearch}
             selectedNation={regionNation}

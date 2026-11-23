@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
-import { ArrowUpRight, Search, Swords } from 'lucide-react';
-import type { Character, RegionalPreset } from '../types/genshin';
+import { ArrowUpRight, Search, Swords, TrendingUp } from 'lucide-react';
+import type {
+  Character,
+  RegionalPreset,
+  TeamRecommendation,
+} from '../types/genshin';
+import { analyzeTeam } from '../engine/teamAnalyzer';
+import { generateTeamsForRegion } from '../engine/teamBuilder';
 import { CharacterPortrait } from './CharacterPortrait';
 import { NationEmblem } from './NationEmblem';
 
@@ -20,11 +26,17 @@ export type NationName = (typeof NATIONS)[number];
 interface RegionalPresetsProps {
   presets: RegionalPreset[];
   roster: Character[];
+  includeUnbuilt: boolean;
+  requireSurvivability: boolean;
   search: string;
   onChangeSearch: (q: string) => void;
   selectedNation: NationName | 'All';
   onChangeNation: (nation: NationName | 'All') => void;
-  onLoadToVisualizer: (preset: RegionalPreset, members: Character[]) => void;
+  onLoadToVisualizer: (
+    preset: RegionalPreset,
+    members: Character[],
+    initialAlt?: TeamRecommendation
+  ) => void;
   onInspectCharacter: (char: Character) => void;
   onSendToAbyss: (
     members: Character[],
@@ -75,6 +87,8 @@ function parseRegionDisplay(rawRegion: string): {
 export function RegionalPresets({
   presets,
   roster,
+  includeUnbuilt,
+  requireSurvivability,
   search,
   onChangeSearch,
   selectedNation,
@@ -90,11 +104,34 @@ export function RegionalPresets({
 
   const enriched = useMemo(
     () =>
-      presets.map((preset) => ({
-        preset,
-        ...parseRegionDisplay(preset.region),
-      })),
-    [presets]
+      presets.map((preset) => {
+        const members = preset.resolvedCharacterIds
+          .map((id) => (id ? charMap.get(id) ?? null : null))
+          .filter((c): c is Character => Boolean(c));
+        const presetScore =
+          members.length === 4 ? analyzeTeam(members).score : 0;
+        const excludePresetSig = members
+          .map((m) => m.id)
+          .slice()
+          .sort()
+          .join('|');
+        const strongestAlt =
+          generateTeamsForRegion(roster, preset.region, {
+            includeUnbuilt,
+            requireSurvivability,
+            excludePresetSig,
+            maxResults: 1,
+          })[0] ?? null;
+
+        return {
+          preset,
+          members,
+          presetScore,
+          strongestAlt,
+          ...parseRegionDisplay(preset.region),
+        };
+      }),
+    [presets, charMap, roster, includeUnbuilt, requireSurvivability]
   );
 
   const filtered = useMemo(() => {
@@ -121,8 +158,8 @@ export function RegionalPresets({
             Party by Region
           </h2>
           <p className="editorial-prose" style={{ marginTop: 4 }}>
-            Pick where you&apos;re exploring in Teyvat to summon your go-to
-            constellation directly into the Team Circle.
+            Pick where you&apos;re exploring in Teyvat to summon your saved
+            sheet squad — or jump straight into a higher-scoring upgrade.
           </p>
         </div>
 
@@ -165,105 +202,141 @@ export function RegionalPresets({
       </div>
 
       <div className="region-list">
-        {filtered.map(({ preset, primaryName, parentNation, subLabel }) => {
-          const members = preset.resolvedCharacterIds
-            .map((id) => (id ? charMap.get(id) ?? null : null))
-            .filter((c): c is Character => Boolean(c));
-          const accentColor = parentNation
-            ? NATION_COLORS[parentNation]
-            : 'var(--gold)';
+        {filtered.map(
+          ({
+            preset,
+            members,
+            presetScore,
+            strongestAlt,
+            primaryName,
+            parentNation,
+            subLabel,
+          }) => {
+            const accentColor = parentNation
+              ? NATION_COLORS[parentNation]
+              : 'var(--gold)';
+            const hasStrongerUpgrade =
+              strongestAlt && strongestAlt.analysis.score >= presetScore + 5;
 
-          return (
-            <div key={preset.id} className="region-row">
-              {/* Focal Point: Region & Sub-Area */}
-              <div className="region-focal">
-                <span
-                  className="region-accent-bar"
-                  style={{ backgroundColor: accentColor }}
-                  aria-hidden="true"
-                />
-                <span
-                  className="nation-crest-badge"
-                  style={{ color: accentColor }}
-                  aria-hidden="true"
-                >
-                  <NationEmblem
-                    nation={parentNation ?? primaryName}
-                    size={18}
-                    color={accentColor}
+            return (
+              <div key={preset.id} className="region-row">
+                {/* Focal Point: Region & Sub-Area */}
+                <div className="region-focal">
+                  <span
+                    className="region-accent-bar"
+                    style={{ backgroundColor: accentColor }}
+                    aria-hidden="true"
                   />
-                </span>
-                <div>
-                  <div className="region-focal-name">
-                    {primaryName}
-                    {subLabel && (
-                      <span className="region-parent-tag">{subLabel}</span>
+                  <span
+                    className="nation-crest-badge"
+                    style={{ color: accentColor }}
+                    aria-hidden="true"
+                  >
+                    <NationEmblem
+                      nation={parentNation ?? primaryName}
+                      size={18}
+                      color={accentColor}
+                    />
+                  </span>
+                  <div>
+                    <div className="region-focal-name">
+                      {primaryName}
+                      {subLabel && (
+                        <span className="region-parent-tag">{subLabel}</span>
+                      )}
+                    </div>
+                    <div className="region-row-sub">
+                      {preset.teamName}
+                      {presetScore > 0 && (
+                        <span style={{ color: 'var(--text-3)' }}>
+                          {' '}
+                          ✦ Score {presetScore}
+                        </span>
+                      )}
+                    </div>
+                    {hasStrongerUpgrade && strongestAlt && (
+                      <button
+                        type="button"
+                        className="inline-entity-link"
+                        style={{
+                          marginTop: 4,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        onClick={() =>
+                          onLoadToVisualizer(preset, members, strongestAlt)
+                        }
+                        title={`Open upgraded ${primaryName} team (${strongestAlt.members.map((m) => m.name).join(' · ')})`}
+                      >
+                        <TrendingUp size={11} />
+                        Stronger option available ({strongestAlt.analysis.score})
+                      </button>
                     )}
                   </div>
-                  <div className="region-row-sub">{preset.teamName}</div>
+                </div>
+
+                {/* 4 Character Portraits (clickable to inspect build) */}
+                <div className="region-portraits">
+                  {members.map((m, idx) => (
+                    <button
+                      key={`${m.id}-${idx}`}
+                      type="button"
+                      className="region-portrait-item clickable-portrait"
+                      onClick={() => onInspectCharacter(m)}
+                      title={`Inspect ${m.name}'s ideal artifacts & build`}
+                    >
+                      <CharacterPortrait character={m} size={48} />
+                      <span className="region-portrait-name">{m.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quiet Actions */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={members.length < 4}
+                    onClick={() => onLoadToVisualizer(preset, members)}
+                  >
+                    Open Circle
+                    <ArrowUpRight size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-action"
+                    disabled={members.length < 4}
+                    onClick={() =>
+                      onSendToAbyss(members, `${primaryName} Squad`, 1)
+                    }
+                    title="Queue for Spiral Abyss Half 1"
+                  >
+                    <Swords size={13} />1
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-action"
+                    disabled={members.length < 4}
+                    onClick={() =>
+                      onSendToAbyss(members, `${primaryName} Squad`, 2)
+                    }
+                    title="Queue for Spiral Abyss Half 2"
+                  >
+                    <Swords size={13} />2
+                  </button>
                 </div>
               </div>
-
-              {/* 4 Character Portraits (clickable to inspect build) */}
-              <div className="region-portraits">
-                {members.map((m, idx) => (
-                  <button
-                    key={`${m.id}-${idx}`}
-                    type="button"
-                    className="region-portrait-item clickable-portrait"
-                    onClick={() => onInspectCharacter(m)}
-                    title={`Inspect ${m.name}'s ideal artifacts & build`}
-                  >
-                    <CharacterPortrait character={m} size={48} />
-                    <span className="region-portrait-name">{m.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Quiet Actions */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  justifyContent: 'flex-end',
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={members.length < 4}
-                  onClick={() => onLoadToVisualizer(preset, members)}
-                >
-                  Open Circle
-                  <ArrowUpRight size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="ghost-action"
-                  disabled={members.length < 4}
-                  onClick={() =>
-                    onSendToAbyss(members, `${primaryName} Squad`, 1)
-                  }
-                  title="Queue for Spiral Abyss Half 1"
-                >
-                  <Swords size={13} />1
-                </button>
-                <button
-                  type="button"
-                  className="ghost-action"
-                  disabled={members.length < 4}
-                  onClick={() =>
-                    onSendToAbyss(members, `${primaryName} Squad`, 2)
-                  }
-                  title="Queue for Spiral Abyss Half 2"
-                >
-                  <Swords size={13} />2
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          }
+        )}
 
         {filtered.length === 0 && (
           <div

@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Bookmark,
   ClipboardCopy,
+  Shuffle,
   Swords,
 } from 'lucide-react';
 import type {
@@ -41,6 +42,7 @@ interface TeamVisualizerProps {
   onReturnToOrigin?: () => void;
   burstSignal?: number;
   onSelectRecommendation: (rec: TeamRecommendation) => void;
+  onShuffleTeam: () => void;
   onSwapSlot: (slotIndex: number, nextChar: Character) => void;
   onInspectCharacter: (char: Character) => void;
   onFatesPick: () => void;
@@ -62,6 +64,7 @@ export function TeamVisualizer({
   onReturnToOrigin,
   burstSignal = 0,
   onSelectRecommendation,
+  onShuffleTeam,
   onSwapSlot,
   onInspectCharacter,
   onFatesPick,
@@ -156,45 +159,68 @@ export function TeamVisualizer({
             burstSignal={burstSignal}
           />
 
-          {/* Compact Portrait-Cluster Switcher when engine recommendations are active */}
-          {hasActiveSelection &&
-            recommendations.length > 1 &&
-            !activeRegionName && (
-              <div
-                className="alt-teams-bar"
-                role="list"
-                aria-label="Alternative team suggestions"
+          {/* Compact Portrait-Cluster Switcher + Shuffle for Regions, Bosses & Filters */}
+          {hasActiveSelection && recommendations.length > 1 && (
+            <div
+              className="alt-teams-bar"
+              role="list"
+              aria-label="Alternative team suggestions"
+            >
+              {recommendations.slice(0, 4).map((rec, i) => {
+                const isActive = rec.id === activeTeam?.id;
+                const isPreset = rec.source === 'preset';
+                const label = isPreset
+                  ? `Sheet · ${rec.analysis.score}`
+                  : activeRegionName && i === 1
+                    ? `Stronger · ${rec.analysis.score}`
+                    : i === 0
+                      ? `Top · ${rec.analysis.score}`
+                      : `Alt ${activeRegionName ? i : i + 1} · ${rec.analysis.score}`;
+
+                return (
+                  <button
+                    key={rec.id}
+                    type="button"
+                    className={`alt-team-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveEdgeIdx(null);
+                      onSelectRecommendation(rec);
+                    }}
+                    title={`${rec.title} (Score ${rec.analysis.score}) — ${rec.members.map((m) => m.name).join(' · ')}`}
+                  >
+                    <span className="avatar-stack">
+                      {rec.members.map((m) => (
+                        <CharacterPortrait
+                          key={m.id}
+                          character={m}
+                          size={24}
+                        />
+                      ))}
+                    </span>
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+
+              <button
+                id="btn-circle-shuffle"
+                type="button"
+                className="alt-team-btn shuffle-pill"
+                onClick={() => {
+                  setActiveEdgeIdx(null);
+                  onShuffleTeam();
+                }}
+                title={
+                  activeRegionName
+                    ? `Shuffle to another strong team for ${activeRegionName}`
+                    : 'Shuffle to another strong alternative team'
+                }
               >
-                {recommendations.slice(0, 4).map((rec, i) => {
-                  const isActive = rec.id === activeTeam?.id;
-                  return (
-                    <button
-                      key={rec.id}
-                      type="button"
-                      className={`alt-team-btn ${isActive ? 'active' : ''}`}
-                      onClick={() => {
-                        setActiveEdgeIdx(null);
-                        onSelectRecommendation(rec);
-                      }}
-                      title={rec.members.map((m) => m.name).join(' · ')}
-                    >
-                      <span className="avatar-stack">
-                        {rec.members.map((m) => (
-                          <CharacterPortrait
-                            key={m.id}
-                            character={m}
-                            size={24}
-                          />
-                        ))}
-                      </span>
-                      <span>
-                        {i === 0 ? 'Top Pick' : `Option ${i + 1}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                <Shuffle size={13} />
+                <span>Shuffle</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Calm, Borderless Scrollable Editorial Readout */}
@@ -548,11 +574,30 @@ export function TeamVisualizer({
                     id="btn-fates-pick"
                     type="button"
                     className="btn-wish"
-                    onClick={onFatesPick}
-                    title="Draw another high-synergy constellation from your roster"
+                    onClick={
+                      recommendations.length > 1 ? onShuffleTeam : onFatesPick
+                    }
+                    title={
+                      recommendations.length > 1
+                        ? activeRegionName
+                          ? `Cycle through other strong teams for ${activeRegionName}`
+                          : 'Cycle through other strong alternative teams'
+                        : 'Draw another high-synergy party from your roster'
+                    }
                   >
-                    <PrimogemStar size={12} />
-                    Fate&apos;s Pick
+                    {recommendations.length > 1 ? (
+                      <>
+                        <Shuffle size={12} />
+                        {activeRegionName
+                          ? `Shuffle ${activeRegionName.split('(')[0].trim()}`
+                          : 'Shuffle Alternatives'}
+                      </>
+                    ) : (
+                      <>
+                        <PrimogemStar size={12} />
+                        Fate&apos;s Pick
+                      </>
+                    )}
                   </button>
                   <button
                     id="btn-copy-sheet-row"
