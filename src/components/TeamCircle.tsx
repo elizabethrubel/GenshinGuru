@@ -177,7 +177,7 @@ export function TeamCircle({
   burstSignal = 0,
 }: TeamCircleProps) {
   const uid = useId().replace(/:/g, '');
-  const portraitSize = compact ? 68 : 86;
+  const portraitSize = compact ? 68 : 102;
 
   // Track slot changes & 4/4 completion to play a crisp Genshin Wish/Ascension golden ripple
   const prevIdsRef = useRef<(string | null)[]>([null, null, null, null]);

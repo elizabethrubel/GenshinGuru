@@ -206,9 +206,9 @@ button {
 }
 
 .header-inner {
-  max-width: 1320px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 28px;
+  padding: 0 32px;
   height: 62px;
   display: flex;
   align-items: center;
@@ -369,10 +369,10 @@ button {
 /* Main Open Canvas */
 .canvas {
   flex: 1;
-  max-width: 1320px;
+  max-width: 1440px;
   width: 100%;
   margin: 0 auto;
-  padding: 20px 28px 56px;
+  padding: 20px 32px 56px;
 }
 
 /* Minimal Command Bar (replaces the heavy sidebar) */
@@ -525,26 +525,31 @@ button {
   background: var(--gold-bright);
 }
 
-/* Hero Circle Stage — Open 2-Column Editorial Layout (Zero Card Boxes!) */
+/* Hero Circle Stage — Sticky Centered Hero Astrolabe + Scrollable Editorial Panel */
 .circle-stage-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 48px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.78fr);
+  gap: 56px;
+  align-items: start;
 }
 
 .circle-column {
+  position: sticky;
+  top: 72px;
+  min-height: calc(100vh - 116px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  justify-content: center;
+  gap: 20px;
 }
 
 /* Team Constellation Circle */
 .team-circle-wrap {
   position: relative;
   width: 100%;
-  max-width: 540px;
+  max-width: min(720px, calc((100vh - 165px) / 0.94));
+  min-width: 340px;
   aspect-ratio: 1 / 0.94;
   margin: 0 auto;
   user-select: none;
@@ -552,6 +557,7 @@ button {
 
 .team-circle-wrap.compact {
   max-width: 440px;
+  min-width: 0;
 }
 
 .team-circle-svg {
@@ -600,37 +606,49 @@ button {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 144px;
+  width: 176px;
   text-align: center;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+}
+
+.team-circle-wrap.compact .circle-center-info {
+  width: 140px;
 }
 
 .circle-center-score {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--gold-bright);
-  text-shadow: 0 0 22px rgba(246, 224, 174, 0.25);
+  text-shadow: 0 0 24px rgba(246, 224, 174, 0.28);
   line-height: 1;
 }
 
+.team-circle-wrap.compact .circle-center-score {
+  font-size: 26px;
+}
+
 .circle-center-state {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--gold-bright);
   letter-spacing: 0.03em;
   line-height: 1.25;
 }
 
-.circle-center-desc {
+.team-circle-wrap.compact .circle-center-state {
   font-size: 11px;
+}
+
+.circle-center-desc {
+  font-size: 12px;
   color: var(--text-2);
-  line-height: 1.3;
-  max-width: 146px;
+  line-height: 1.35;
+  max-width: 168px;
 }
 
 /* Character Portrait Medallions on the Ring */
@@ -640,7 +658,7 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   background: none;
   border: none;
   padding: 0;
@@ -659,7 +677,7 @@ button {
 .circle-node-ring {
   position: relative;
   border-radius: 999px;
-  padding: 3px;
+  padding: 3.5px;
   background: linear-gradient(145deg, var(--el, var(--gold)), rgba(246, 240, 228, 0.12));
   box-shadow:
     0 12px 28px rgba(5, 8, 18, 0.56),
@@ -677,10 +695,10 @@ button {
 
 .circle-node-el-dot {
   position: absolute;
-  top: -1px;
-  right: -1px;
-  width: 24px;
-  height: 24px;
+  top: 0;
+  right: 0;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   background: #131a2f;
   border: 1px solid color-mix(in srgb, var(--el, var(--gold)) 52%, rgba(246, 240, 228, 0.25));
@@ -694,9 +712,9 @@ button {
   position: absolute;
   bottom: -2px;
   right: -4px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 1px 6px;
+  padding: 1.5px 7px;
   border-radius: 999px;
   background: #131a2f;
   border: 1px solid var(--hairline-strong);
@@ -712,27 +730,31 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 1.2;
+  line-height: 1.22;
   text-shadow: 0 2px 12px rgba(6, 9, 20, 0.95);
 }
 
 .circle-node-name {
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
 }
 
+.team-circle-wrap.compact .circle-node-name {
+  font-size: 13px;
+}
+
 .circle-node-role {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-3);
   white-space: nowrap;
 }
 
 .circle-empty-ring {
-  width: 72px;
-  height: 72px;
+  width: 90px;
+  height: 90px;
   border-radius: 999px;
   border: 1.5px dashed rgba(229, 198, 135, 0.28);
   background: radial-gradient(circle, rgba(23, 30, 53, 0.8) 0%, rgba(16, 21, 38, 0.85) 100%);
@@ -741,6 +763,11 @@ button {
   justify-content: center;
   color: var(--text-3);
   transition: all 0.24s var(--spring);
+}
+
+.team-circle-wrap.compact .circle-empty-ring {
+  width: 68px;
+  height: 68px;
 }
 
 .circle-node:hover .circle-empty-ring {
@@ -852,10 +879,13 @@ button {
   margin-left: 0;
 }
 
-/* Right-Hand Borderless Editorial Readout */
+/* Right-Hand Borderless Scrollable Editorial Readout */
 .editorial-panel {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  min-height: calc(100vh - 170px);
+  padding: 12px 0 56px;
   gap: 20px;
 }
 
@@ -1644,6 +1674,18 @@ button {
   .circle-stage-layout {
     grid-template-columns: 1fr;
     gap: 32px;
+  }
+  .circle-column {
+    position: static;
+    min-height: auto;
+  }
+  .team-circle-wrap {
+    max-width: 540px;
+    min-width: 0;
+  }
+  .editorial-panel {
+    min-height: auto;
+    padding: 0 0 24px;
   }
   .abyss-dual-stage {
     grid-template-columns: 1fr;
