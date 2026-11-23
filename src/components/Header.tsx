@@ -6,7 +6,6 @@ interface HeaderProps {
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   savedCount: number;
-  abyssHalvesReady: 0 | 1 | 2;
   includeUnbuilt: boolean;
   onToggleIncludeUnbuilt: () => void;
   onOpenSettings: () => void;
@@ -17,7 +16,6 @@ export function Header({
   activeTab,
   onSelectTab,
   savedCount,
-  abyssHalvesReady,
   includeUnbuilt,
   onToggleIncludeUnbuilt,
   onOpenSettings,
@@ -62,15 +60,7 @@ export function Header({
             className={`nav-link ${activeTab === 'abyss' ? 'active' : ''}`}
             onClick={() => onSelectTab('abyss')}
           >
-            <span>Spiral Abyss</span>
-            {abyssHalvesReady > 0 && (
-              <span
-                className={`nav-pip ${abyssHalvesReady === 2 ? 'complete' : ''}`}
-                title={`${abyssHalvesReady} of 2 Abyss halves loaded`}
-              >
-                {abyssHalvesReady}/2
-              </span>
-            )}
+            Spiral Abyss
           </button>
 
           <button

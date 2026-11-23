@@ -105,17 +105,17 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
     };
     resize();
 
-    // Seed sparse, atmospheric starfield with layered depth
-    const starCount = Math.min(54, Math.max(30, Math.floor((width * height) / 28000)));
+    // Seed atmospheric starfield with layered depth & crisp shimmer
+    const starCount = Math.min(78, Math.max(44, Math.floor((width * height) / 19500)));
     const stars: BgStar[] = Array.from({ length: starCount }, (_, i) => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      r: i % 9 === 0 ? 1.8 + Math.random() * 1.1 : 0.65 + Math.random() * 0.9,
-      depth: 0.25 + Math.random() * 0.75,
+      r: i % 7 === 0 ? 2.1 + Math.random() * 1.3 : 0.75 + Math.random() * 1.05,
+      depth: 0.3 + Math.random() * 0.7,
       phase: Math.random() * Math.PI * 2,
-      speed: 0.45 + Math.random() * 0.85,
-      isStarShape: i % 9 === 0,
-      tint: i % 5 === 0 ? 'ambient' : i % 2 === 0 ? 'gold' : 'ivory',
+      speed: 0.7 + Math.random() * 1.15,
+      isStarShape: i % 7 === 0,
+      tint: i % 4 === 0 ? 'ambient' : i % 2 === 0 ? 'gold' : 'ivory',
     }));
 
     const motes: CursorMote[] = [];
@@ -139,10 +139,10 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
       isClickBurst = false
     ) => {
       if (reducedMotion || isCoarsePointer) return;
-      // Keep particle budget intentionally restrained so it never feels noisy
-      if (motes.length >= 22) motes.shift();
+      // Keep particle budget restrained so it stays refined and airy
+      if (motes.length >= 26) motes.shift();
 
-      const useAmbient = Math.random() < 0.35;
+      const useAmbient = Math.random() < 0.38;
       const rgb: [number, number, number] = useAmbient
         ? [
             Math.round(currentRgb[0]),
@@ -155,26 +155,26 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
 
       const angle = Math.random() * Math.PI * 2;
       const speed = isClickBurst
-        ? 0.45 + Math.random() * 0.65
-        : 0.08 + Math.random() * 0.18;
+        ? 0.5 + Math.random() * 0.75
+        : 0.1 + Math.random() * 0.2;
 
       motes.push({
         x: x + (Math.random() - 0.5) * (isClickBurst ? 4 : 8),
         y: y + (Math.random() - 0.5) * (isClickBurst ? 4 : 8),
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - (isClickBurst ? 0.15 : 0.22),
+        vy: Math.sin(angle) * speed - (isClickBurst ? 0.18 : 0.24),
         size: isClickBurst
-          ? 2.6 + Math.random() * 2.2
-          : 1.5 + Math.random() * 2.4,
+          ? 3.1 + Math.random() * 2.4
+          : 1.9 + Math.random() * 2.7,
         age: 0,
         life: isClickBurst
-          ? 480 + Math.random() * 240
-          : 620 + Math.random() * 340,
+          ? 520 + Math.random() * 260
+          : 680 + Math.random() * 360,
         rotation: Math.random() * Math.PI,
-        vRot: (Math.random() - 0.5) * 0.018,
-        isStar: isClickBurst ? true : Math.random() < 0.48,
+        vRot: (Math.random() - 0.5) * 0.02,
+        isStar: isClickBurst ? true : Math.random() < 0.55,
         rgb,
-        maxAlpha: isClickBurst ? 0.5 : 0.34 + Math.random() * 0.14,
+        maxAlpha: isClickBurst ? 0.7 : 0.48 + Math.random() * 0.18,
       });
     };
 
@@ -190,7 +190,7 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
       const now = performance.now();
 
       // Distance + cooldown gating keeps the sparkle airy, sparse, and luxury
-      if (dist >= 28 && now - pointer.lastSpawnTime >= 42) {
+      if (dist >= 24 && now - pointer.lastSpawnTime >= 36) {
         pointer.lastSpawnX = e.clientX;
         pointer.lastSpawnY = e.clientY;
         pointer.lastSpawnTime = now;
@@ -228,12 +228,12 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
       }
 
       // Smooth pointer tracking for parallax & lantern glow
-      pointer.smoothX += (pointer.x - pointer.smoothX) * 0.08;
-      pointer.smoothY += (pointer.y - pointer.smoothY) * 0.08;
+      pointer.smoothX += (pointer.x - pointer.smoothX) * 0.09;
+      pointer.smoothY += (pointer.y - pointer.smoothY) * 0.09;
 
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Subtle cursor lantern aura (extremely quiet, adds tactile dimension)
+      // 1. Soft cursor lantern aura
       if (pointer.active && !isCoarsePointer && !reducedMotion) {
         const lantern = ctx.createRadialGradient(
           pointer.smoothX,
@@ -241,29 +241,29 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
           0,
           pointer.smoothX,
           pointer.smoothY,
-          150
+          175
         );
         lantern.addColorStop(
           0,
-          `rgba(${Math.round(currentRgb[0])}, ${Math.round(currentRgb[1])}, ${Math.round(currentRgb[2])}, 0.055)`
+          `rgba(${Math.round(currentRgb[0])}, ${Math.round(currentRgb[1])}, ${Math.round(currentRgb[2])}, 0.1)`
         );
-        lantern.addColorStop(0.45, 'rgba(246, 224, 174, 0.022)');
+        lantern.addColorStop(0.45, 'rgba(246, 224, 174, 0.04)');
         lantern.addColorStop(1, 'rgba(246, 224, 174, 0)');
         ctx.fillStyle = lantern;
         ctx.beginPath();
-        ctx.arc(pointer.smoothX, pointer.smoothY, 150, 0, Math.PI * 2);
+        ctx.arc(pointer.smoothX, pointer.smoothY, 175, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // 2. Dimensional twinkling starfield with soft mouse parallax
-      const parallaxX = ((pointer.smoothX / Math.max(width, 1)) - 0.5) * -14;
-      const parallaxY = ((pointer.smoothY / Math.max(height, 1)) - 0.5) * -10;
+      const parallaxX = ((pointer.smoothX / Math.max(width, 1)) - 0.5) * -16;
+      const parallaxY = ((pointer.smoothY / Math.max(height, 1)) - 0.5) * -12;
       const tSec = now * 0.001;
 
       for (const s of stars) {
         if (!reducedMotion) {
-          // Glacial upward celestial drift
-          s.y -= 0.035 * s.depth * (dt / 16.6);
+          // Gentle upward celestial drift
+          s.y -= 0.05 * s.depth * (dt / 16.6);
           if (s.y < -10) {
             s.y = height + 10;
             s.x = Math.random() * width;
@@ -271,24 +271,41 @@ export function CelestialBackdrop({ ambientElement }: CelestialBackdropProps) {
         }
 
         const twinkle = reducedMotion
-          ? 0.55
-          : 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(tSec * s.speed + s.phase));
-        const alpha = twinkle * (s.isStarShape ? 0.36 : 0.42) * s.depth;
+          ? 0.65
+          : 0.22 + 0.78 * (0.5 + 0.5 * Math.sin(tSec * s.speed + s.phase));
+        const alpha = twinkle * (s.isStarShape ? 0.66 : 0.62) * s.depth;
 
         const drawX = s.x + parallaxX * s.depth;
         const drawY = s.y + parallaxY * s.depth;
 
-        if (s.tint === 'ambient') {
-          ctx.fillStyle = `rgba(${Math.round(currentRgb[0])}, ${Math.round(currentRgb[1])}, ${Math.round(currentRgb[2])}, ${alpha})`;
-        } else if (s.tint === 'gold') {
-          ctx.fillStyle = `rgba(246, 224, 174, ${alpha})`;
-        } else {
-          ctx.fillStyle = `rgba(246, 240, 228, ${alpha})`;
-        }
+        const rgbStr =
+          s.tint === 'ambient'
+            ? `${Math.round(currentRgb[0])}, ${Math.round(currentRgb[1])}, ${Math.round(currentRgb[2])}`
+            : s.tint === 'gold'
+              ? '246, 224, 174'
+              : '246, 240, 228';
 
         if (s.isStarShape) {
-          drawFourPointStar(ctx, drawX, drawY, s.r * 2.1, tSec * 0.12 + s.phase);
+          // Soft luminous halo behind larger 4-point shimmering stars
+          const halo = ctx.createRadialGradient(
+            drawX,
+            drawY,
+            0,
+            drawX,
+            drawY,
+            s.r * 5.2
+          );
+          halo.addColorStop(0, `rgba(${rgbStr}, ${alpha * 0.42})`);
+          halo.addColorStop(1, `rgba(${rgbStr}, 0)`);
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, s.r * 5.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = `rgba(${rgbStr}, ${alpha})`;
+          drawFourPointStar(ctx, drawX, drawY, s.r * 2.4, tSec * 0.16 + s.phase);
         } else {
+          ctx.fillStyle = `rgba(${rgbStr}, ${alpha})`;
           ctx.beginPath();
           ctx.arc(drawX, drawY, s.r, 0, Math.PI * 2);
           ctx.fill();

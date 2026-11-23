@@ -472,9 +472,9 @@ export function TeamCircle({
           </>
         ) : presentIndices.length === 0 ? (
           <>
-            <span className="circle-center-state">Four Visions</span>
+            <span className="circle-center-state">Four Characters</span>
             <span className="circle-center-desc">
-              Awaiting a constellation — tap any + slot
+              Tap any + slot to assemble your party
             </span>
           </>
         ) : (
@@ -506,7 +506,7 @@ export function TeamCircle({
               <div className="circle-empty-ring">
                 <Plus size={20} />
               </div>
-              <span className="circle-node-role">Vision {idx + 1}</span>
+              <span className="circle-node-role">Character {idx + 1}</span>
             </button>
           );
         }

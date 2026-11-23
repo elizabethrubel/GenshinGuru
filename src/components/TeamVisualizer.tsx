@@ -209,7 +209,7 @@ export function TeamVisualizer({
                 <p className="editorial-prose" style={{ marginTop: 10 }}>
                   Choose a <strong>Region</strong>, <strong>Reaction Style</strong>,{' '}
                   <strong>Boss</strong>, or <strong>Anchor Character</strong>{' '}
-                  above — or tap any of the four Vision slots on the astrolabe to
+                  above — or tap any of the four character slots on the astrolabe to
                   watch their elemental chords come alive.
                 </p>
               </div>
@@ -392,7 +392,7 @@ export function TeamVisualizer({
                   {visibleEdges.length === 0 && (
                     <p className="editorial-prose">
                       {filledMembers.length < 2
-                        ? 'Add another Vision on the circle to awaken elemental reaction chords.'
+                        ? 'Add another character on the circle to see elemental reaction chords.'
                         : 'Mono-element or raw damage pairing without direct reaction chords.'}
                     </p>
                   )}

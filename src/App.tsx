@@ -697,10 +697,6 @@ export default function App() {
     return best;
   }, [activeTab, activeTeam, manualSlots]);
 
-  const abyssHalvesReady = (
-    (half1Ids.every(Boolean) ? 1 : 0) + (half2Ids.every(Boolean) ? 1 : 0)
-  ) as 0 | 1 | 2;
-
   return (
     <div
       className="app-shell"
@@ -712,7 +708,6 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab, true)}
         savedCount={savedTeams.length + savedAbyssPairs.length}
-        abyssHalvesReady={abyssHalvesReady}
         includeUnbuilt={filters.includeUnbuilt}
         onToggleIncludeUnbuilt={() => {
           const next = !filters.includeUnbuilt;

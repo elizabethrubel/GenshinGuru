@@ -70,46 +70,75 @@ body {
 /* Dimensional breathing aurora shimmer behind the twilight sky */
 @keyframes celestial-veil-a {
   0% {
-    transform: translate3d(-2%, -1%, 0) scale(1);
-    opacity: 0.65;
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.72;
   }
   50% {
-    transform: translate3d(2.5%, 1.5%, 0) scale(1.06);
+    transform: translate3d(4%, 2.5%, 0) scale(1.09);
     opacity: 1;
   }
   100% {
-    transform: translate3d(-2%, -1%, 0) scale(1);
-    opacity: 0.65;
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.72;
   }
 }
 
 @keyframes celestial-veil-b {
   0% {
-    transform: translate3d(2%, 1%, 0) scale(1.04);
-    opacity: 0.55;
+    transform: translate3d(3.5%, 2%, 0) scale(1.06);
+    opacity: 0.65;
   }
   50% {
-    transform: translate3d(-2.5%, -1.5%, 0) scale(0.98);
-    opacity: 0.92;
+    transform: translate3d(-3.5%, -2.5%, 0) scale(0.96);
+    opacity: 1;
   }
   100% {
-    transform: translate3d(2%, 1%, 0) scale(1.04);
-    opacity: 0.55;
+    transform: translate3d(3.5%, 2%, 0) scale(1.06);
+    opacity: 0.65;
+  }
+}
+
+@keyframes celestial-sheen-sweep {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }
 
 body::before {
   content: '';
   position: fixed;
-  inset: -8%;
+  inset: -10%;
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 46% 36% at 18% 22%, rgba(229, 198, 135, 0.065), transparent 68%),
-    radial-gradient(ellipse 44% 38% at 84% 16%, rgba(126, 168, 245, 0.08), transparent 66%),
-    radial-gradient(ellipse 48% 36% at 62% 84%, rgba(164, 140, 232, 0.055), transparent 70%);
-  animation: celestial-veil-a 24s ease-in-out infinite;
+    radial-gradient(ellipse 52% 40% at 16% 20%, rgba(235, 204, 140, 0.145), transparent 66%),
+    radial-gradient(ellipse 48% 42% at 84% 16%, rgba(126, 174, 250, 0.165), transparent 64%),
+    radial-gradient(ellipse 52% 40% at 58% 86%, rgba(172, 148, 240, 0.125), transparent 68%);
+  animation: celestial-veil-a 16s ease-in-out infinite;
   will-change: transform, opacity;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    118deg,
+    transparent 18%,
+    rgba(246, 224, 174, 0.055) 38%,
+    rgba(140, 226, 247, 0.065) 52%,
+    transparent 74%
+  );
+  background-size: 240% 240%;
+  animation: celestial-sheen-sweep 18s ease-in-out infinite;
 }
 
 .celestial-backdrop-canvas {
@@ -181,17 +210,17 @@ button {
 .app-shell::before {
   content: '';
   position: fixed;
-  inset: -6%;
+  inset: -8%;
   pointer-events: none;
   z-index: -1;
   background: radial-gradient(
-    ellipse 54% 44% at 30% 42%,
-    rgba(var(--ambient-rgb), 0.12) 0%,
-    rgba(var(--ambient-rgb), 0.035) 44%,
+    ellipse 56% 46% at 30% 42%,
+    rgba(var(--ambient-rgb), 0.21) 0%,
+    rgba(var(--ambient-rgb), 0.068) 44%,
     transparent 70%
   );
   transition: background 1.1s ease;
-  animation: celestial-veil-b 30s ease-in-out infinite;
+  animation: celestial-veil-b 20s ease-in-out infinite;
   will-change: transform, opacity;
 }
 
@@ -1994,6 +2023,7 @@ button {
 /* Respect Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   body::before,
+  body::after,
   .app-shell::before,
   .astrolabe-outer,
   .astrolabe-inner,
