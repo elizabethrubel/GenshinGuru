@@ -558,7 +558,11 @@ export default function App() {
   }, [activeTab, activeTeam, manualSlots]);
 
   return (
-    <div className="app-shell" data-ambient={ambientElement}>
+    <div
+      className="app-shell"
+      data-ambient={ambientElement}
+      data-tab={activeTab}
+    >
       <CelestialBackdrop ambientElement={ambientElement} />
       <Header
         activeTab={activeTab}

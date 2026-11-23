@@ -124,7 +124,7 @@ export function TeamVisualizer({
   }, [activeTeam, isFullTeam, filledMembers, liveAnalysis]);
 
   return (
-    <div>
+    <div className="visualizer-root">
       <div className="circle-stage-layout">
         {/* Left: Hero Circular Team Constellation */}
         <div className="circle-column">
@@ -179,10 +179,10 @@ export function TeamVisualizer({
             )}
         </div>
 
-        {/* Right: Calm, Borderless Editorial Readout */}
+        {/* Right: Calm, Borderless Scrollable Editorial Readout */}
         <section className="editorial-panel" aria-label="Team breakdown">
           {isEmptyLanding ? (
-            <>
+            <div className="editorial-empty-center">
               <div>
                 <div className="section-kicker" style={{ color: 'var(--gold)' }}>
                   ✦ Constellation Astrolabe
@@ -238,7 +238,7 @@ export function TeamVisualizer({
                   <ArrowUpRight size={13} />
                 </button>
               </div>
-            </>
+            </div>
           ) : isNoFilterMatch ? (
             <div>
               <h2 className="editorial-title" style={{ fontSize: 22 }}>

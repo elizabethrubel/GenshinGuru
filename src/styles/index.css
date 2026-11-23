@@ -525,39 +525,93 @@ button {
   background: var(--gold-bright);
 }
 
-/* Hero Circle Stage — Sticky Centered Hero Astrolabe + Scrollable Editorial Panel */
+/* Hero Circle Stage — Viewport-Locked Centered Astrolabe + Independently Scrollable Details */
+.visualizer-root {
+  display: flex;
+  flex-direction: column;
+}
+
 .circle-stage-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.78fr);
-  gap: 56px;
+  grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.78fr);
+  gap: 44px;
   align-items: start;
 }
 
 .circle-column {
-  position: sticky;
-  top: 72px;
-  min-height: calc(100vh - 116px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 18px;
 }
 
 /* Team Constellation Circle */
 .team-circle-wrap {
   position: relative;
-  width: 100%;
-  max-width: min(720px, calc((100vh - 165px) / 0.94));
-  min-width: 340px;
+  width: min(740px, 100%, calc((100vh - 210px) / 0.94));
+  max-height: calc(100% - 8px);
   aspect-ratio: 1 / 0.94;
   margin: 0 auto;
   user-select: none;
 }
 
 .team-circle-wrap.compact {
+  width: 100%;
   max-width: 440px;
-  min-width: 0;
+  max-height: none;
+}
+
+@media (min-width: 780px) {
+  .app-shell[data-tab='visualizer'] {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app-shell[data-tab='visualizer'] .canvas {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 16px 32px 16px;
+  }
+
+  .app-shell[data-tab='visualizer'] .command-bar {
+    position: relative;
+    z-index: 20;
+    flex-shrink: 0;
+    margin-bottom: 10px;
+    padding-bottom: 14px;
+  }
+
+  .app-shell[data-tab='visualizer'] .visualizer-root {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell[data-tab='visualizer'] .circle-stage-layout {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    align-items: stretch;
+  }
+
+  .app-shell[data-tab='visualizer'] .circle-column {
+    height: 100%;
+    min-height: 0;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  .app-shell[data-tab='visualizer'] .editorial-panel {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    justify-content: flex-start;
+    padding: 16px 14px 44px 4px;
+  }
 }
 
 .team-circle-svg {
@@ -883,9 +937,13 @@ button {
 .editorial-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  min-height: calc(100vh - 170px);
-  padding: 12px 0 56px;
+  gap: 20px;
+}
+
+.editorial-empty-center {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
@@ -1671,22 +1729,6 @@ button {
 
 /* Responsive */
 @media (max-width: 1080px) {
-  .circle-stage-layout {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
-  .circle-column {
-    position: static;
-    min-height: auto;
-  }
-  .team-circle-wrap {
-    max-width: 540px;
-    min-width: 0;
-  }
-  .editorial-panel {
-    min-height: auto;
-    padding: 0 0 24px;
-  }
   .abyss-dual-stage {
     grid-template-columns: 1fr;
     gap: 36px;
@@ -1702,6 +1744,19 @@ button {
   .focus-build-row {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+}
+
+@media (max-width: 779px) {
+  .circle-stage-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .team-circle-wrap {
+    width: min(460px, 100%);
+  }
+  .editorial-panel {
+    padding: 0 0 28px;
   }
 }
 
