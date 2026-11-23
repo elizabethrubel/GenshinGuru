@@ -49,6 +49,7 @@ import { RegionalPresets } from './components/RegionalPresets';
 import { RosterView } from './components/RosterView';
 import { SavedTeamsDrawer } from './components/SavedTeamsView';
 import { SettingsModal } from './components/SettingsModal';
+import { CelestialBackdrop } from './components/CelestialBackdrop';
 
 const EMPTY_SLOTS: [
   Character | null,
@@ -558,6 +559,7 @@ export default function App() {
 
   return (
     <div className="app-shell" data-ambient={ambientElement}>
+      <CelestialBackdrop ambientElement={ambientElement} />
       <Header
         activeTab={activeTab}
         onSelectTab={setActiveTab}
