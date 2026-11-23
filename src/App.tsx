@@ -42,14 +42,18 @@ import {
 } from './services/storage';
 import { Header } from './components/Header';
 import { FilterPanel } from './components/FilterPanel';
-import { TeamVisualizer } from './components/TeamVisualizer';
-import { BossesView } from './components/BossesView';
+import {
+  TeamVisualizer,
+  type OriginContext,
+} from './components/TeamVisualizer';
+import { BossesView, type BossFilterKey } from './components/BossesView';
 import { AbyssPlanner } from './components/AbyssPlanner';
-import { RegionalPresets } from './components/RegionalPresets';
+import { RegionalPresets, type NationName } from './components/RegionalPresets';
 import { RosterView } from './components/RosterView';
 import { SavedTeamsDrawer } from './components/SavedTeamsView';
 import { SettingsModal } from './components/SettingsModal';
 import { CelestialBackdrop } from './components/CelestialBackdrop';
+import { CharacterBuildDrawer } from './components/CharacterBuildDrawer';
 
 const EMPTY_SLOTS: [
   Character | null,
@@ -58,8 +62,31 @@ const EMPTY_SLOTS: [
   Character | null,
 ] = [null, null, null, null];
 
+const VALID_TABS: ActiveTab[] = [
+  'visualizer',
+  'bosses',
+  'abyss',
+  'regions',
+  'roster',
+];
+
+function readTabFromHash(): ActiveTab {
+  const raw = window.location.hash.replace(/^#/, '').split('?')[0].toLowerCase();
+  if (raw === 'circle' || raw === 'visualizer') return 'visualizer';
+  if (VALID_TABS.includes(raw as ActiveTab)) return raw as ActiveTab;
+  return 'visualizer';
+}
+
+interface ToastState {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('visualizer');
+  const [activeTab, setActiveTabState] = useState<ActiveTab>(() =>
+    readTabFromHash()
+  );
   const [roster, setRoster] = useState<Character[]>(SNAPSHOT_CHARACTERS);
   const [presets, setPresets] = useState<RegionalPreset[]>(SNAPSHOT_PRESETS);
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
@@ -68,6 +95,24 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showSavedDrawer, setShowSavedDrawer] = useState(false);
+
+  // Shared Character Build & Artifact drawer accessible from any tab
+  const [inspectedCharacter, setInspectedCharacter] =
+    useState<Character | null>(null);
+
+  // Breadcrumb origin context when jumping into Team Circle from Bosses/Regions/Roster
+  const [originContext, setOriginContext] = useState<OriginContext | null>(null);
+
+  // Preserved per-tab filters so switching tabs never loses your place
+  const [bossSearch, setBossSearch] = useState('');
+  const [bossFilterKey, setBossFilterKey] = useState<BossFilterKey>('All');
+  const [regionSearch, setRegionSearch] = useState('');
+  const [regionNation, setRegionNation] = useState<NationName | 'All'>('All');
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterElement, setRosterElement] = useState<ElementType | 'All'>('All');
+  const [rosterReadiness, setRosterReadiness] = useState<
+    'all' | 'ready' | 'unbuilt'
+  >('all');
 
   // Start completely clean on landing — zero presets auto-selected!
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
@@ -108,12 +153,41 @@ export default function App() {
     loadSavedAbyssPairs()
   );
 
-  const [toast, setToast] = useState<string | null>(null);
-  const notify = (msg: string) => setToast(msg);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const notify = (
+    message: string,
+    action?: { label: string; onAction: () => void }
+  ) =>
+    setToast({
+      message,
+      actionLabel: action?.label,
+      onAction: action?.onAction,
+    });
+
+  // Sync tab navigation with URL hash so browser Back/Forward works naturally
+  const setActiveTab = (tab: ActiveTab, clearOrigin = false) => {
+    setActiveTabState(tab);
+    if (clearOrigin) setOriginContext(null);
+    const targetHash = tab === 'visualizer' ? '#circle' : `#${tab}`;
+    if (window.location.hash !== targetHash) {
+      window.history.pushState(null, '', targetHash);
+    }
+  };
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setActiveTabState(readTabFromHash());
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3200);
+    const t = window.setTimeout(
+      () => setToast(null),
+      toast.actionLabel ? 4600 : 3200
+    );
     return () => window.clearTimeout(t);
   }, [toast]);
 
@@ -431,8 +505,13 @@ export default function App() {
       );
     }
 
-    setActiveTab('abyss');
-    notify(`Loaded into Spiral Abyss Half ${half}.`);
+    notify(`Queued "${label}" in Abyss Half ${half}`, {
+      label: 'Open Abyss →',
+      onAction: () => {
+        setToast(null);
+        setActiveTab('abyss', true);
+      },
+    });
   };
 
   const handleLoadPresetToVisualizer = (
@@ -440,10 +519,16 @@ export default function App() {
     members: Character[]
   ) => {
     loadPresetIntoCircle(preset, members);
+    setOriginContext({
+      fromTab: 'regions',
+      label: 'Regions',
+      detail: preset.region,
+    });
     setActiveTab('visualizer');
   };
 
   const handleBuildAroundCharacter = (char: Character) => {
+    const sourceTab = activeTab;
     handleChangeFilters({
       ...filters,
       archetypeId: null,
@@ -452,8 +537,63 @@ export default function App() {
       includeUnbuilt:
         char.level < BATTLE_READY_LEVEL ? true : filters.includeUnbuilt,
     });
+    if (sourceTab !== 'visualizer') {
+      setOriginContext({
+        fromTab: sourceTab,
+        label:
+          sourceTab === 'roster'
+            ? 'Roster'
+            : sourceTab === 'bosses'
+              ? 'Bosses'
+              : sourceTab === 'regions'
+                ? 'Regions'
+                : 'Spiral Abyss',
+        detail: char.name,
+      });
+    } else {
+      setOriginContext(null);
+    }
     setActiveTab('visualizer');
     notify(`Built Team Circle around ${char.name}.`);
+  };
+
+  const handleOpenBossCounter = (
+    boss: EncounterDefinition,
+    precomputedRec?: TeamRecommendation
+  ) => {
+    const sourceTab = activeTab;
+    setSelectedRegionId(null);
+    setFilters((prev) => ({
+      ...prev,
+      archetypeId: null,
+      encounterId: boss.id,
+      anchorCharacterId: null,
+    }));
+    if (precomputedRec) {
+      setManualSlots(precomputedRec.members);
+      setSelectedRecId(precomputedRec.id);
+    } else {
+      setManualSlots(EMPTY_SLOTS);
+      setSelectedRecId(null);
+    }
+    setManualTeam(null);
+    if (sourceTab !== 'visualizer') {
+      setOriginContext({
+        fromTab: sourceTab,
+        label:
+          sourceTab === 'bosses'
+            ? 'Bosses'
+            : sourceTab === 'roster'
+              ? 'Roster'
+              : sourceTab === 'regions'
+                ? 'Regions'
+                : 'Spiral Abyss',
+        detail: boss.name,
+      });
+    } else {
+      setOriginContext(null);
+    }
+    setActiveTab('visualizer');
   };
 
   // Playful Wish-inspired "Fate's Pick" that summons a fresh, strong, distinct constellation
@@ -557,6 +697,10 @@ export default function App() {
     return best;
   }, [activeTab, activeTeam, manualSlots]);
 
+  const abyssHalvesReady = (
+    (half1Ids.every(Boolean) ? 1 : 0) + (half2Ids.every(Boolean) ? 1 : 0)
+  ) as 0 | 1 | 2;
+
   return (
     <div
       className="app-shell"
@@ -566,11 +710,19 @@ export default function App() {
       <CelestialBackdrop ambientElement={ambientElement} />
       <Header
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={(tab) => setActiveTab(tab, true)}
         savedCount={savedTeams.length + savedAbyssPairs.length}
-        settings={settings}
-        isSyncing={isSyncing}
-        onSyncNow={() => void performLiveSync(settings)}
+        abyssHalvesReady={abyssHalvesReady}
+        includeUnbuilt={filters.includeUnbuilt}
+        onToggleIncludeUnbuilt={() => {
+          const next = !filters.includeUnbuilt;
+          setFilters((prev) => ({ ...prev, includeUnbuilt: next }));
+          notify(
+            next
+              ? 'Character pool widened to Lv 1–90 across all tabs.'
+              : 'Character pool set to Battle-Ready (Lv 70+) across all tabs.'
+          );
+        }}
         onOpenSettings={() => setShowSettings(true)}
         onOpenSavedDrawer={() => setShowSavedDrawer(true)}
       />
@@ -582,9 +734,15 @@ export default function App() {
               roster={roster}
               presets={presets}
               selectedRegionId={selectedRegionId}
-              onSelectRegion={handleSelectRegionDropdown}
+              onSelectRegion={(presetId) => {
+                setOriginContext(null);
+                handleSelectRegionDropdown(presetId);
+              }}
               filters={filters}
-              onChangeFilters={handleChangeFilters}
+              onChangeFilters={(next) => {
+                setOriginContext(null);
+                handleChangeFilters(next);
+              }}
               hasGeminiKey={Boolean(settings.geminiApiKey)}
               isAskingGemini={isAskingGemini}
               geminiError={geminiError}
@@ -598,6 +756,14 @@ export default function App() {
               manualSlots={manualSlots}
               hasActiveSelection={hasActiveFilterCriteria}
               activeRegionName={activeRegionPreset?.region ?? null}
+              originContext={originContext}
+              onReturnToOrigin={() => {
+                if (originContext) {
+                  const dest = originContext.fromTab;
+                  setOriginContext(null);
+                  setActiveTab(dest);
+                }
+              }}
               burstSignal={fatesBurstKey}
               onSelectRecommendation={(rec) => {
                 setSelectedRegionId(null);
@@ -606,7 +772,11 @@ export default function App() {
                 setSelectedRecId(rec.id);
               }}
               onSwapSlot={handleSwapSlot}
-              onFatesPick={handleFatesPick}
+              onInspectCharacter={(char) => setInspectedCharacter(char)}
+              onFatesPick={() => {
+                setOriginContext(null);
+                handleFatesPick();
+              }}
               roster={roster}
               includeUnbuilt={filters.includeUnbuilt}
               onSaveTeam={handleSaveTeam}
@@ -620,7 +790,7 @@ export default function App() {
               onSendToAbyss={(t, half) =>
                 handleSendToAbyss(t.members, t.title, half)
               }
-              onNavigateTab={(tab) => setActiveTab(tab)}
+              onNavigateTab={(tab) => setActiveTab(tab, true)}
             />
           </>
         )}
@@ -629,28 +799,14 @@ export default function App() {
           <BossesView
             roster={roster}
             includeUnbuilt={filters.includeUnbuilt}
-            onToggleIncludeUnbuilt={() =>
-              setFilters((prev) => ({
-                ...prev,
-                includeUnbuilt: !prev.includeUnbuilt,
-              }))
+            search={bossSearch}
+            onChangeSearch={setBossSearch}
+            filterKey={bossFilterKey}
+            onChangeFilterKey={setBossFilterKey}
+            onOpenBossInCircle={(boss, rec) =>
+              handleOpenBossCounter(boss, rec)
             }
-            onOpenBossInCircle={(
-              boss: EncounterDefinition,
-              rec: TeamRecommendation
-            ) => {
-              setSelectedRegionId(null);
-              setFilters((prev) => ({
-                ...prev,
-                archetypeId: null,
-                encounterId: boss.id,
-                anchorCharacterId: null,
-              }));
-              setManualSlots(rec.members);
-              setManualTeam(null);
-              setSelectedRecId(rec.id);
-              setActiveTab('visualizer');
-            }}
+            onInspectCharacter={(char) => setInspectedCharacter(char)}
             onSendToAbyss={handleSendToAbyss}
           />
         )}
@@ -702,7 +858,12 @@ export default function App() {
           <RegionalPresets
             presets={presets}
             roster={roster}
+            search={regionSearch}
+            onChangeSearch={setRegionSearch}
+            selectedNation={regionNation}
+            onChangeNation={setRegionNation}
             onLoadToVisualizer={handleLoadPresetToVisualizer}
+            onInspectCharacter={(char) => setInspectedCharacter(char)}
             onSendToAbyss={handleSendToAbyss}
           />
         )}
@@ -712,11 +873,27 @@ export default function App() {
             roster={roster}
             isSyncing={isSyncing}
             lastSyncedAt={settings.lastSyncedAt}
+            search={rosterSearch}
+            onChangeSearch={setRosterSearch}
+            elementFilter={rosterElement}
+            onChangeElementFilter={setRosterElement}
+            readinessFilter={rosterReadiness}
+            onChangeReadinessFilter={setRosterReadiness}
             onRefreshRoster={() => void performLiveSync(settings)}
+            onInspectCharacter={(char) => setInspectedCharacter(char)}
             onBuildAroundCharacter={handleBuildAroundCharacter}
           />
         )}
       </main>
+
+      {inspectedCharacter && (
+        <CharacterBuildDrawer
+          character={inspectedCharacter}
+          onClose={() => setInspectedCharacter(null)}
+          onBuildAroundCharacter={handleBuildAroundCharacter}
+          onOpenBossCounter={(boss) => handleOpenBossCounter(boss)}
+        />
+      )}
 
       {showSavedDrawer && (
         <SavedTeamsDrawer
@@ -732,6 +909,7 @@ export default function App() {
               Character,
             ];
             const analysis = analyzeTeam(tuple);
+            setOriginContext(null);
             setSelectedRegionId(null);
             setManualSlots(tuple);
             setManualTeam({
@@ -763,7 +941,7 @@ export default function App() {
             setHalf2Ids(pair.half2Ids);
             setHalf1Label(pair.half1Label);
             setHalf2Label(pair.half2Label);
-            setActiveTab('abyss');
+            setActiveTab('abyss', true);
             notify(`Loaded "${pair.name}" into Spiral Abyss.`);
           }}
           onDeleteAbyssPair={(id) => {
@@ -808,7 +986,16 @@ export default function App() {
       {toast && (
         <div className="toast" role="status" aria-live="polite">
           <CheckCircle2 size={14} color="var(--gold-bright)" />
-          <span>{toast}</span>
+          <span>{toast.message}</span>
+          {toast.actionLabel && toast.onAction && (
+            <button
+              type="button"
+              className="toast-action-btn"
+              onClick={toast.onAction}
+            >
+              {toast.actionLabel}
+            </button>
+          )}
         </div>
       )}
     </div>

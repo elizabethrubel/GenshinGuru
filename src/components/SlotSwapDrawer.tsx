@@ -1,29 +1,34 @@
 import { useMemo, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { ArrowUpRight, Search, Sparkles, X } from 'lucide-react';
 import type { Character } from '../types/genshin';
 import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
 import { getSlotSubstitutes } from '../engine/teamBuilder';
+import { getArtifactGuide } from '../data/artifactGuides';
 import { CharacterPortrait } from './CharacterPortrait';
 
 interface SlotSwapDrawerProps {
   title: string;
+  currentCharacter?: Character | null;
   currentMembers: Character[];
   slotIndex: number;
   roster: Character[];
   includeUnbuilt: boolean;
   excludedIds?: string[];
   onPickCharacter: (char: Character) => void;
+  onInspectCharacter?: (char: Character) => void;
   onClose: () => void;
 }
 
 export function SlotSwapDrawer({
   title,
+  currentCharacter,
   currentMembers,
   slotIndex,
   roster,
   includeUnbuilt,
   excludedIds = [],
   onPickCharacter,
+  onInspectCharacter,
   onClose,
 }: SlotSwapDrawerProps) {
   const [search, setSearch] = useState('');
@@ -51,6 +56,10 @@ export function SlotSwapDrawer({
         s.character.specialMechanic.toLowerCase().includes(q)
     );
   }, [substitutes, search]);
+
+  const currentGuide = currentCharacter
+    ? getArtifactGuide(currentCharacter)
+    : null;
 
   return (
     <div
@@ -81,6 +90,42 @@ export function SlotSwapDrawer({
         </div>
 
         <div className="drawer-body">
+          {/* Quick cross-link to inspect the current slot character's artifacts & boss */}
+          {currentCharacter && onInspectCharacter && currentGuide && (
+            <button
+              type="button"
+              className="crosslink-row"
+              onClick={() => {
+                onClose();
+                onInspectCharacter(currentCharacter);
+              }}
+            >
+              <span className="crosslink-row-left">
+                <CharacterPortrait character={currentCharacter} size={34} />
+                <span>
+                  <strong style={{ color: 'var(--text)' }}>
+                    View {currentCharacter.name}&apos;s Artifacts &amp; Build
+                  </strong>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      color: 'var(--gold)',
+                      marginTop: 1,
+                    }}
+                  >
+                    <Sparkles
+                      size={11}
+                      style={{ marginRight: 4, verticalAlign: -1 }}
+                    />
+                    {currentGuide.primarySet}
+                  </span>
+                </span>
+              </span>
+              <ArrowUpRight size={14} style={{ color: 'var(--gold-bright)', flexShrink: 0 }} />
+            </button>
+          )}
+
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div className="command-search-wrap" style={{ minWidth: 0 }}>
               <Search size={14} className="command-search-icon" />

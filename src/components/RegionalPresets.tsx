@@ -1,21 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowUpRight, Search, Swords } from 'lucide-react';
 import type { Character, RegionalPreset } from '../types/genshin';
 import { CharacterPortrait } from './CharacterPortrait';
 import { NationEmblem } from './NationEmblem';
 
-interface RegionalPresetsProps {
-  presets: RegionalPreset[];
-  roster: Character[];
-  onLoadToVisualizer: (preset: RegionalPreset, members: Character[]) => void;
-  onSendToAbyss: (
-    members: Character[],
-    label: string,
-    half: 1 | 2
-  ) => void;
-}
-
-const NATIONS = [
+export const NATIONS = [
   'Mondstadt',
   'Liyue',
   'Inazuma',
@@ -26,7 +15,23 @@ const NATIONS = [
   'Snezhnaya',
 ] as const;
 
-type NationName = (typeof NATIONS)[number];
+export type NationName = (typeof NATIONS)[number];
+
+interface RegionalPresetsProps {
+  presets: RegionalPreset[];
+  roster: Character[];
+  search: string;
+  onChangeSearch: (q: string) => void;
+  selectedNation: NationName | 'All';
+  onChangeNation: (nation: NationName | 'All') => void;
+  onLoadToVisualizer: (preset: RegionalPreset, members: Character[]) => void;
+  onInspectCharacter: (char: Character) => void;
+  onSendToAbyss: (
+    members: Character[],
+    label: string,
+    half: 1 | 2
+  ) => void;
+}
 
 const NATION_COLORS: Record<NationName, string> = {
   Mondstadt: 'var(--el-anemo)',
@@ -70,12 +75,14 @@ function parseRegionDisplay(rawRegion: string): {
 export function RegionalPresets({
   presets,
   roster,
+  search,
+  onChangeSearch,
+  selectedNation,
+  onChangeNation,
   onLoadToVisualizer,
+  onInspectCharacter,
   onSendToAbyss,
 }: RegionalPresetsProps) {
-  const [search, setSearch] = useState('');
-  const [selectedNation, setSelectedNation] = useState<NationName | 'All'>('All');
-
   const charMap = useMemo(
     () => new Map(roster.map((c) => [c.id, c])),
     [roster]
@@ -125,7 +132,7 @@ export function RegionalPresets({
             type="text"
             className="command-input"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => onChangeSearch(e.target.value)}
             placeholder="Search region or sub-area…"
           />
         </div>
@@ -136,7 +143,7 @@ export function RegionalPresets({
         <button
           type="button"
           className={`text-tab ${selectedNation === 'All' ? 'active' : ''}`}
-          onClick={() => setSelectedNation('All')}
+          onClick={() => onChangeNation('All')}
         >
           All Regions ({presets.length})
         </button>
@@ -145,7 +152,7 @@ export function RegionalPresets({
             key={nation}
             type="button"
             className={`text-tab ${selectedNation === nation ? 'active' : ''}`}
-            onClick={() => setSelectedNation(nation)}
+            onClick={() => onChangeNation(nation)}
           >
             <NationEmblem
               nation={nation}
@@ -197,18 +204,31 @@ export function RegionalPresets({
                 </div>
               </div>
 
-              {/* 4 Character Portraits */}
+              {/* 4 Character Portraits (clickable to inspect build) */}
               <div className="region-portraits">
                 {members.map((m, idx) => (
-                  <div key={`${m.id}-${idx}`} className="region-portrait-item">
+                  <button
+                    key={`${m.id}-${idx}`}
+                    type="button"
+                    className="region-portrait-item clickable-portrait"
+                    onClick={() => onInspectCharacter(m)}
+                    title={`Inspect ${m.name}'s ideal artifacts & build`}
+                  >
                     <CharacterPortrait character={m} size={48} />
                     <span className="region-portrait-name">{m.name}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
 
               {/* Quiet Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  justifyContent: 'flex-end',
+                }}
+              >
                 <button
                   type="button"
                   className="btn-primary"
@@ -223,13 +243,9 @@ export function RegionalPresets({
                   className="ghost-action"
                   disabled={members.length < 4}
                   onClick={() =>
-                    onSendToAbyss(
-                      members,
-                      `${primaryName} Squad`,
-                      1
-                    )
+                    onSendToAbyss(members, `${primaryName} Squad`, 1)
                   }
-                  title="Send to Spiral Abyss Half 1"
+                  title="Queue for Spiral Abyss Half 1"
                 >
                   <Swords size={13} />1
                 </button>
@@ -238,13 +254,9 @@ export function RegionalPresets({
                   className="ghost-action"
                   disabled={members.length < 4}
                   onClick={() =>
-                    onSendToAbyss(
-                      members,
-                      `${primaryName} Squad`,
-                      2
-                    )
+                    onSendToAbyss(members, `${primaryName} Squad`, 2)
                   }
-                  title="Send to Spiral Abyss Half 2"
+                  title="Queue for Spiral Abyss Half 2"
                 >
                   <Swords size={13} />2
                 </button>

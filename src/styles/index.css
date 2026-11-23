@@ -1715,6 +1715,282 @@ button {
   z-index: 1;
 }
 
+/* Spiral Abyss Half-Progress Pip on Nav Tab */
+.nav-pip {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(229, 198, 135, 0.14);
+  color: var(--gold-bright);
+  border: 1px solid rgba(229, 198, 135, 0.3);
+  line-height: 1.35;
+}
+
+.nav-pip.complete {
+  background: rgba(114, 207, 156, 0.14);
+  color: var(--ok);
+  border-color: rgba(114, 207, 156, 0.34);
+}
+
+/* Global Pool Readiness Pill in Header */
+.readiness-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(246, 240, 228, 0.04);
+  border: 1px solid var(--hairline-strong);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s var(--spring);
+}
+
+.readiness-pill:hover {
+  border-color: var(--gold-dim);
+  color: var(--text);
+}
+
+.readiness-pill.all-levels {
+  background: rgba(229, 198, 135, 0.12);
+  border-color: var(--gold-dim);
+  color: var(--gold-bright);
+}
+
+.readiness-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ok);
+}
+
+.readiness-pill.all-levels .readiness-dot {
+  background: var(--gold-bright);
+}
+
+/* Instant ⌘K Omnibox */
+.kbd-hint {
+  position: absolute;
+  right: 10px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  background: rgba(16, 21, 38, 0.65);
+  pointer-events: none;
+}
+
+.omnibox-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 45;
+  background: rgba(19, 25, 46, 0.97);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 14px;
+  box-shadow: 0 22px 56px rgba(4, 7, 16, 0.72);
+  padding: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.omnibox-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 6px 10px 4px;
+}
+
+.omnibox-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.omnibox-item.active,
+.omnibox-item:hover {
+  background: rgba(229, 198, 135, 0.1);
+}
+
+.omnibox-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(246, 240, 228, 0.04);
+}
+
+.omnibox-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.omnibox-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omnibox-sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omnibox-kind {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gold);
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.active-scope-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-bright);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(229, 198, 135, 0.11);
+  border: 1px solid var(--gold-dim);
+  white-space: nowrap;
+}
+
+/* Return Breadcrumb Pill in Team Visualizer */
+.origin-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 2px 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold);
+  transition: color 0.16s ease, transform 0.2s var(--spring);
+}
+
+.origin-breadcrumb:hover {
+  color: var(--gold-bright);
+  transform: translateX(-2px);
+}
+
+.origin-breadcrumb-detail {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+/* Cross-Link Action Row inside Build & Swap Drawers */
+.crosslink-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(229, 198, 135, 0.065);
+  text-align: left;
+  transition: all 0.2s var(--spring);
+}
+
+.crosslink-row:hover {
+  background: rgba(229, 198, 135, 0.13);
+  border-color: var(--gold-bright);
+  transform: translateY(-1px);
+}
+
+.crosslink-row-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+/* Clickable Drop Links & Portraits in Bosses / Regions */
+.inline-drop-links {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.inline-entity-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: rgba(246, 224, 174, 0.4);
+  text-underline-offset: 2px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.inline-entity-link:hover {
+  color: #fff8e7;
+  text-decoration-color: var(--gold-bright);
+}
+
+.clickable-portrait {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* Actionable Toast Link (e.g., Open Abyss →) */
+.toast-action-btn {
+  margin-left: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--gold-dim);
+  background: rgba(229, 198, 135, 0.14);
+  color: var(--gold-bright);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.toast-action-btn:hover {
+  background: rgba(229, 198, 135, 0.24);
+  border-color: var(--gold-bright);
+}
+
 /* Respect Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   body::before,

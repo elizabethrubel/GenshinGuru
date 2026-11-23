@@ -1,12 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ArrowUpRight,
-  Compass,
   RefreshCw,
   Search,
-  Sparkles,
   TrendingUp,
-  X,
 } from 'lucide-react';
 import type { Character, ElementType } from '../types/genshin';
 import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
@@ -19,7 +16,14 @@ interface RosterViewProps {
   roster: Character[];
   isSyncing: boolean;
   lastSyncedAt: string | null;
+  search: string;
+  onChangeSearch: (q: string) => void;
+  elementFilter: ElementType | 'All';
+  onChangeElementFilter: (el: ElementType | 'All') => void;
+  readinessFilter: 'all' | 'ready' | 'unbuilt';
+  onChangeReadinessFilter: (r: 'all' | 'ready' | 'unbuilt') => void;
   onRefreshRoster: () => void;
+  onInspectCharacter: (char: Character) => void;
   onBuildAroundCharacter: (char: Character) => void;
 }
 
@@ -37,16 +41,16 @@ export function RosterView({
   roster,
   isSyncing,
   lastSyncedAt,
+  search,
+  onChangeSearch,
+  elementFilter,
+  onChangeElementFilter,
+  readinessFilter,
+  onChangeReadinessFilter,
   onRefreshRoster,
+  onInspectCharacter,
   onBuildAroundCharacter,
 }: RosterViewProps) {
-  const [search, setSearch] = useState('');
-  const [elementFilter, setElementFilter] = useState<ElementType | 'All'>('All');
-  const [readinessFilter, setReadinessFilter] = useState<
-    'all' | 'ready' | 'unbuilt'
-  >('all');
-  const [inspectChar, setInspectChar] = useState<Character | null>(null);
-
   const buildPriorities = useMemo(
     () => getRosterBuildPriorities(roster, 5),
     [roster]
@@ -80,7 +84,6 @@ export function RosterView({
   }, [roster, search, elementFilter, readinessFilter]);
 
   const readyCount = roster.filter((c) => c.level >= BATTLE_READY_LEVEL).length;
-  const inspectedGuide = inspectChar ? getArtifactGuide(inspectChar) : null;
 
   return (
     <div>
@@ -117,12 +120,12 @@ export function RosterView({
             <button
               id="btn-roster-refresh"
               type="button"
-              className="btn-primary"
+              className="btn-subtle"
               disabled={isSyncing}
               onClick={onRefreshRoster}
             >
               <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
-              {isSyncing ? 'Refreshing from Sheet…' : 'Refresh from Spreadsheet'}
+              {isSyncing ? 'Refreshing from Sheet…' : 'Refresh from Sheet'}
             </button>
           </div>
 
@@ -135,14 +138,17 @@ export function RosterView({
                   <button
                     type="button"
                     className="focus-build-identity"
-                    style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left' }}
-                    onClick={() => setInspectChar(c)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => onInspectCharacter(c)}
                   >
                     <div className={`circle-node-ring el-${c.element}`}>
                       <CharacterPortrait character={c} size={52} />
-                      <span className="circle-node-lv unbuilt">
-                        {c.level}
-                      </span>
+                      <span className="circle-node-lv unbuilt">{c.level}</span>
                     </div>
                     <div>
                       <div className="focus-build-name">
@@ -198,9 +204,9 @@ export function RosterView({
                     <button
                       type="button"
                       className="ghost-action"
-                      onClick={() => setInspectChar(c)}
+                      onClick={() => onInspectCharacter(c)}
                     >
-                      Artifacts
+                      Artifacts &amp; Boss
                     </button>
                     <button
                       type="button"
@@ -230,8 +236,8 @@ export function RosterView({
             {lastSyncedAt
               ? ` · Refreshed ${new Date(lastSyncedAt).toLocaleTimeString()}`
               : ''}
-            . Click any character to inspect full artifact stats &amp; build a
-            team.
+            . Click any character to inspect ideal artifacts, farm their boss,
+            or build a team.
           </p>
         </div>
 
@@ -241,7 +247,7 @@ export function RosterView({
             type="text"
             className="command-input"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => onChangeSearch(e.target.value)}
             placeholder="Search character or artifact set…"
           />
         </div>
@@ -252,7 +258,7 @@ export function RosterView({
         <button
           type="button"
           className={`text-tab ${elementFilter === 'All' ? 'active' : ''}`}
-          onClick={() => setElementFilter('All')}
+          onClick={() => onChangeElementFilter('All')}
         >
           All
         </button>
@@ -261,7 +267,7 @@ export function RosterView({
             key={el}
             type="button"
             className={`text-tab ${elementFilter === el ? 'active' : ''}`}
-            onClick={() => setElementFilter(el)}
+            onClick={() => onChangeElementFilter(el)}
           >
             <ElementIcon element={el} size={13} />
             {el}
@@ -281,7 +287,7 @@ export function RosterView({
             key={key}
             type="button"
             className={`text-tab ${readinessFilter === key ? 'active' : ''}`}
-            onClick={() => setReadinessFilter(key)}
+            onClick={() => onChangeReadinessFilter(key)}
           >
             {label}
           </button>
@@ -297,8 +303,8 @@ export function RosterView({
               key={c.id}
               type="button"
               className={`roster-item el-${c.element}`}
-              onClick={() => setInspectChar(c)}
-              title={`Inspect ${c.name}'s ideal artifacts & build`}
+              onClick={() => onInspectCharacter(c)}
+              title={`Inspect ${c.name}'s ideal artifacts & ascension boss`}
             >
               <div className="circle-node-ring">
                 <CharacterPortrait character={c} size={84} />
@@ -323,145 +329,12 @@ export function RosterView({
                       ? 'Shielder'
                       : c.role.split('/')[0].trim()}
                 </div>
-                <div className="roster-item-artifact">
-                  {guide.primarySet}
-                </div>
+                <div className="roster-item-artifact">{guide.primarySet}</div>
               </div>
             </button>
           );
         })}
       </div>
-
-      {/* Clean Character Artifact & Build Slide-Over Drawer */}
-      {inspectChar && inspectedGuide && (
-        <div
-          className="overlay-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${inspectChar.name} artifact guide`}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setInspectChar(null);
-          }}
-        >
-          <div className="drawer-panel">
-            <div className="drawer-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className={`circle-node-ring el-${inspectChar.element}`}>
-                  <CharacterPortrait character={inspectChar} size={50} />
-                </div>
-                <div>
-                  <h3 className="drawer-title">{inspectChar.name}</h3>
-                  <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                    <span className={`el-text-${inspectChar.element}`}>
-                      {inspectChar.element}
-                    </span>{' '}
-                    · {inspectChar.weapon} · Lv {inspectChar.level} ·{' '}
-                    {inspectChar.rarity}★
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="ghost-action"
-                onClick={() => setInspectChar(null)}
-                aria-label="Close artifact guide"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="drawer-body" style={{ gap: 20 }}>
-              <div>
-                <div className="section-kicker" style={{ color: 'var(--gold)' }}>
-                  <Sparkles
-                    size={12}
-                    style={{ marginRight: 5, verticalAlign: -1 }}
-                  />
-                  Best-in-Slot Artifact Set
-                </div>
-                <div
-                  style={{
-                    fontSize: 17,
-                    fontWeight: 700,
-                    color: 'var(--text)',
-                    marginBottom: 6,
-                  }}
-                >
-                  {inspectedGuide.primarySet}
-                </div>
-                <p className="editorial-prose">{inspectedGuide.note}</p>
-              </div>
-
-              <hr className="hairline" />
-
-              <div>
-                <div className="section-kicker">Strong Alternative</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)' }}>
-                  {inspectedGuide.alternativeSet}
-                </div>
-              </div>
-
-              <hr className="hairline" />
-
-              <div>
-                <div className="section-kicker">Ideal Main Stats</div>
-                <div className="stat-spec-list">
-                  <div className="stat-spec-row">
-                    <span className="stat-spec-label">Sands</span>
-                    <span className="stat-spec-val">{inspectedGuide.sands}</span>
-                  </div>
-                  <div className="stat-spec-row">
-                    <span className="stat-spec-label">Goblet</span>
-                    <span className="stat-spec-val">{inspectedGuide.goblet}</span>
-                  </div>
-                  <div className="stat-spec-row">
-                    <span className="stat-spec-label">Circlet</span>
-                    <span className="stat-spec-val">{inspectedGuide.circlet}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="section-kicker">Substat Priority</div>
-                <div style={{ fontSize: 13.5, color: 'var(--text-2)', fontWeight: 500 }}>
-                  {inspectedGuide.substats}
-                </div>
-              </div>
-
-              <hr className="hairline" />
-
-              <div>
-                <div className="section-kicker">Role &amp; Archetype</div>
-                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-                  {inspectChar.role} — {inspectChar.specialMechanic}
-                </div>
-                {inspectChar.constellations.length > 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
-                    Unlocked Constellations (C{inspectChar.constellations.length}
-                    ): {inspectChar.constellations.join(', ')}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: 'auto', paddingTop: 12 }}>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', padding: '10px 16px' }}
-                  onClick={() => {
-                    const target = inspectChar;
-                    setInspectChar(null);
-                    onBuildAroundCharacter(target);
-                  }}
-                >
-                  <Compass size={14} />
-                  Build Team Circle Around {inspectChar.name}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

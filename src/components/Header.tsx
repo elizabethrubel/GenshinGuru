@@ -1,14 +1,14 @@
-import { Bookmark, RefreshCw, Settings } from 'lucide-react';
-import type { ActiveTab, AppSettings } from '../types/genshin';
+import { Bookmark, Settings } from 'lucide-react';
+import type { ActiveTab } from '../types/genshin';
 import { PrimogemStar } from './NationEmblem';
 
 interface HeaderProps {
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   savedCount: number;
-  settings: AppSettings;
-  isSyncing: boolean;
-  onSyncNow: () => void;
+  abyssHalvesReady: 0 | 1 | 2;
+  includeUnbuilt: boolean;
+  onToggleIncludeUnbuilt: () => void;
   onOpenSettings: () => void;
   onOpenSavedDrawer: () => void;
 }
@@ -17,14 +17,12 @@ export function Header({
   activeTab,
   onSelectTab,
   savedCount,
-  settings,
-  isSyncing,
-  onSyncNow,
+  abyssHalvesReady,
+  includeUnbuilt,
+  onToggleIncludeUnbuilt,
   onOpenSettings,
   onOpenSavedDrawer,
 }: HeaderProps) {
-  const isLive = settings.dataSource === 'live-sheets';
-
   return (
     <header className="app-header">
       <div className="header-inner">
@@ -64,7 +62,15 @@ export function Header({
             className={`nav-link ${activeTab === 'abyss' ? 'active' : ''}`}
             onClick={() => onSelectTab('abyss')}
           >
-            Spiral Abyss
+            <span>Spiral Abyss</span>
+            {abyssHalvesReady > 0 && (
+              <span
+                className={`nav-pip ${abyssHalvesReady === 2 ? 'complete' : ''}`}
+                title={`${abyssHalvesReady} of 2 Abyss halves loaded`}
+              >
+                {abyssHalvesReady}/2
+              </span>
+            )}
           </button>
 
           <button
@@ -87,21 +93,20 @@ export function Header({
         </nav>
 
         <div className="header-tools">
+          {/* Unified global Battle-Ready vs Full Roster toggle across all tabs */}
           <button
-            id="btn-refresh-roster"
+            id="btn-global-readiness"
             type="button"
-            className="btn-subtle"
-            disabled={isSyncing}
-            onClick={onSyncNow}
+            className={`readiness-pill ${includeUnbuilt ? 'all-levels' : ''}`}
+            onClick={onToggleIncludeUnbuilt}
             title={
-              settings.lastSyncedAt
-                ? `Last refreshed ${new Date(settings.lastSyncedAt).toLocaleTimeString()} — click to re-sync from Google Sheets`
-                : 'Pull latest character levels and teams from your Google Sheet'
+              includeUnbuilt
+                ? 'Showing all owned characters (Lv 1–90) across Team Circle, Bosses, and Abyss — click to restrict to Lv 70+'
+                : 'Showing Battle-Ready characters (Lv 70+) across Team Circle, Bosses, and Abyss — click to include unbuilt characters'
             }
           >
-            <span className={`sync-dot ${isLive ? 'live' : ''}`} />
-            <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
-            <span>{isSyncing ? 'Refreshing…' : 'Refresh Roster'}</span>
+            <span className="readiness-dot" aria-hidden="true" />
+            <span>{includeUnbuilt ? 'Pool: Lv 1–90' : 'Pool: Lv 70+'}</span>
           </button>
 
           <button

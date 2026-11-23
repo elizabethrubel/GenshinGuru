@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowUpRight, Search, Swords } from 'lucide-react';
 import { ENCOUNTERS } from '../data/encounters';
 import type {
@@ -10,22 +10,7 @@ import { generateRecommendedTeams } from '../engine/teamBuilder';
 import { CharacterPortrait } from './CharacterPortrait';
 import { NationEmblem } from './NationEmblem';
 
-interface BossesViewProps {
-  roster: Character[];
-  includeUnbuilt: boolean;
-  onToggleIncludeUnbuilt: () => void;
-  onOpenBossInCircle: (
-    boss: EncounterDefinition,
-    rec: TeamRecommendation
-  ) => void;
-  onSendToAbyss: (
-    members: Character[],
-    label: string,
-    half: 1 | 2
-  ) => void;
-}
-
-type BossFilterKey =
+export type BossFilterKey =
   | 'All'
   | 'Stygian 7.2'
   | 'Snezhnaya'
@@ -34,6 +19,25 @@ type BossFilterKey =
   | 'Natlan'
   | 'Weekly'
   | 'Classic';
+
+interface BossesViewProps {
+  roster: Character[];
+  includeUnbuilt: boolean;
+  search: string;
+  onChangeSearch: (q: string) => void;
+  filterKey: BossFilterKey;
+  onChangeFilterKey: (key: BossFilterKey) => void;
+  onOpenBossInCircle: (
+    boss: EncounterDefinition,
+    rec: TeamRecommendation
+  ) => void;
+  onInspectCharacter: (char: Character) => void;
+  onSendToAbyss: (
+    members: Character[],
+    label: string,
+    half: 1 | 2
+  ) => void;
+}
 
 const BOSS_FILTERS: BossFilterKey[] = [
   'All',
@@ -60,13 +64,14 @@ const REGION_ACCENT: Record<string, string> = {
 export function BossesView({
   roster,
   includeUnbuilt,
-  onToggleIncludeUnbuilt,
+  search,
+  onChangeSearch,
+  filterKey,
+  onChangeFilterKey,
   onOpenBossInCircle,
+  onInspectCharacter,
   onSendToAbyss,
 }: BossesViewProps) {
-  const [search, setSearch] = useState('');
-  const [filterKey, setFilterKey] = useState<BossFilterKey>('All');
-
   const filteredBosses = useMemo(() => {
     const q = search.trim().toLowerCase();
     return ENCOUNTERS.filter((boss) => {
@@ -97,7 +102,6 @@ export function BossesView({
     });
   }, [search, filterKey]);
 
-  // Compute the #1 strongest team from the user's live roster for each visible boss
   const bossMatchups = useMemo(() => {
     return filteredBosses.map((boss) => {
       const topRec =
@@ -122,36 +126,25 @@ export function BossesView({
     <div>
       <div className="list-toolbar">
         <div>
-          <h2 className="editorial-title" style={{ fontSize: 24 }}>
+          <h2 className="editorial-title" style={{ fontSize: 25 }}>
             Boss Matchups
           </h2>
           <p className="editorial-prose" style={{ marginTop: 4 }}>
             Your strongest counter team for each World Boss, Stygian Onslaught
-            7.2 boss, and Weekly Trounce Domain — computed live from your
-            roster.
+            7.2 boss, and Weekly Trounce Domain — computed live from your{' '}
+            <strong>{includeUnbuilt ? 'Lv 1–90' : 'Lv 70+'}</strong> pool.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className={`btn-subtle ${includeUnbuilt ? 'active-filter' : ''}`}
-            onClick={onToggleIncludeUnbuilt}
-            title="Switch between Battle-Ready Lv 70+ teams and full roster including unbuilt characters"
-          >
-            {includeUnbuilt ? 'Showing Lv 1–90' : 'Battle-Ready (Lv 70+)'}
-          </button>
-
-          <div className="command-search-wrap" style={{ maxWidth: 270 }}>
-            <Search size={14} className="command-search-icon" />
-            <input
-              type="text"
-              className="command-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search boss or drop (e.g. Wavebinder, Mitya)…"
-            />
-          </div>
+        <div className="command-search-wrap" style={{ maxWidth: 280 }}>
+          <Search size={14} className="command-search-icon" />
+          <input
+            type="text"
+            className="command-input"
+            value={search}
+            onChange={(e) => onChangeSearch(e.target.value)}
+            placeholder="Search boss or drop (e.g. Wavebinder, Mitya)…"
+          />
         </div>
       </div>
 
@@ -159,13 +152,14 @@ export function BossesView({
       <div className="roster-filter-bar" style={{ paddingBottom: 14 }}>
         {BOSS_FILTERS.map((key) => {
           const emblemColor =
-            REGION_ACCENT[key] ?? (key === 'Stygian 7.2' ? 'var(--gold-bright)' : 'var(--text-2)');
+            REGION_ACCENT[key] ??
+            (key === 'Stygian 7.2' ? 'var(--gold-bright)' : 'var(--text-2)');
           return (
             <button
               key={key}
               type="button"
               className={`text-tab ${filterKey === key ? 'active' : ''}`}
-              onClick={() => setFilterKey(key)}
+              onClick={() => onChangeFilterKey(key)}
             >
               {key !== 'All' && key !== 'Weekly' && key !== 'Classic' && (
                 <NationEmblem nation={key} size={13} color={emblemColor} />
@@ -179,13 +173,15 @@ export function BossesView({
       <div className="region-list">
         {bossMatchups.map(({ boss, topRec }) => {
           const accent = REGION_ACCENT[boss.region] ?? 'var(--gold)';
-          const ownedDrops = (boss.dropsFor ?? []).filter((name) =>
-            roster.some((c) => c.name.toLowerCase() === name.toLowerCase())
-          );
+          const ownedDropChars = (boss.dropsFor ?? [])
+            .map((name) =>
+              roster.find((c) => c.name.toLowerCase() === name.toLowerCase())
+            )
+            .filter((c): c is Character => Boolean(c));
 
           return (
             <div key={boss.id} className="boss-row">
-              {/* Left: Boss Focal Point + Mechanic Tip */}
+              {/* Left: Boss Focal Point + Clickable Character Drops + Mechanic Tip */}
               <div className="region-focal">
                 <span
                   className="region-accent-bar"
@@ -197,31 +193,35 @@ export function BossesView({
                   style={{ color: accent }}
                   aria-hidden="true"
                 >
-                  <NationEmblem
-                    nation={boss.region}
-                    size={17}
-                    color={accent}
-                  />
+                  <NationEmblem nation={boss.region} size={17} color={accent} />
                 </span>
                 <div style={{ minWidth: 0 }}>
                   <div className="region-focal-name">
                     <span>{boss.name}</span>
                     <span className="region-parent-tag">
                       {boss.region}
-                      {boss.isStygian72 ? ' ✦ Stygian 7.2' : ` ✦ ${boss.category}`}
+                      {boss.isStygian72
+                        ? ' ✦ Stygian 7.2'
+                        : ` ✦ ${boss.category}`}
                     </span>
                   </div>
 
-                  {ownedDrops.length > 0 && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: 'var(--gold)',
-                        fontWeight: 600,
-                        marginTop: 2,
-                      }}
-                    >
-                      Drops ascension mats for: {ownedDrops.join(', ')}
+                  {ownedDropChars.length > 0 && (
+                    <div className="inline-drop-links">
+                      <span>Drops mats for:</span>
+                      {ownedDropChars.map((char, i) => (
+                        <span key={char.id}>
+                          <button
+                            type="button"
+                            className="inline-entity-link"
+                            onClick={() => onInspectCharacter(char)}
+                            title={`Inspect ${char.name}'s artifacts & build`}
+                          >
+                            {char.name} (Lv {char.level})
+                          </button>
+                          {i < ownedDropChars.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
                     </div>
                   )}
 
@@ -231,22 +231,25 @@ export function BossesView({
                 </div>
               </div>
 
-              {/* Center: Recommended 4-Portrait Team */}
+              {/* Center: Recommended 4-Portrait Team (clickable to inspect build) */}
               {topRec ? (
                 <div className="region-portraits">
                   {topRec.members.map((m, idx) => (
-                    <div
+                    <button
                       key={`${m.id}-${idx}`}
-                      className="region-portrait-item"
+                      type="button"
+                      className="region-portrait-item clickable-portrait"
+                      onClick={() => onInspectCharacter(m)}
+                      title={`Inspect ${m.name}'s ideal artifacts & build`}
                     >
                       <CharacterPortrait character={m} size={48} />
                       <span className="region-portrait-name">{m.name}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (
                 <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-                  Enable Lv 1–90 to see counter
+                  Switch top bar to Pool: Lv 1–90 to see counter
                 </div>
               )}
 
@@ -275,7 +278,7 @@ export function BossesView({
                   onClick={() =>
                     topRec && onSendToAbyss(topRec.members, boss.name, 1)
                   }
-                  title={`Send ${boss.name} team to Spiral Abyss Half 1`}
+                  title={`Queue ${boss.name} team for Spiral Abyss Half 1`}
                 >
                   <Swords size={13} />1
                 </button>
@@ -286,7 +289,7 @@ export function BossesView({
                   onClick={() =>
                     topRec && onSendToAbyss(topRec.members, boss.name, 2)
                   }
-                  title={`Send ${boss.name} team to Spiral Abyss Half 2`}
+                  title={`Queue ${boss.name} team for Spiral Abyss Half 2`}
                 >
                   <Swords size={13} />2
                 </button>

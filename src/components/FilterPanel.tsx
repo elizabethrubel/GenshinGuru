@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   RotateCcw,
   Search,
@@ -13,6 +13,8 @@ import type {
   RegionalPreset,
 } from '../types/genshin';
 import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
+import { CharacterPortrait } from './CharacterPortrait';
+import { NationEmblem, PrimogemStar } from './NationEmblem';
 
 interface FilterPanelProps {
   roster: Character[];
@@ -28,6 +30,38 @@ interface FilterPanelProps {
   onOpenSettings: () => void;
 }
 
+type OmniboxSuggestion =
+  | {
+      kind: 'boss';
+      id: string;
+      title: string;
+      subtitle: string;
+      region: string;
+      encounterId: string;
+    }
+  | {
+      kind: 'region';
+      id: string;
+      title: string;
+      subtitle: string;
+      region: string;
+      presetId: string;
+    }
+  | {
+      kind: 'character';
+      id: string;
+      title: string;
+      subtitle: string;
+      character: Character;
+    }
+  | {
+      kind: 'archetype';
+      id: string;
+      title: string;
+      subtitle: string;
+      archetypeId: string;
+    };
+
 export function FilterPanel({
   roster,
   presets,
@@ -42,12 +76,35 @@ export function FilterPanel({
   onOpenSettings,
 }: FilterPanelProps) {
   const [queryText, setQueryText] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [showRules, setShowRules] = useState(false);
+
+  const searchRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
+  // Cmd/Ctrl+K global shortcut focuses the omnibox cleanly
   useEffect(() => {
-    if (!showRules) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
       if (
         popoverRef.current &&
         !popoverRef.current.contains(e.target as Node)
@@ -57,70 +114,207 @@ export function FilterPanel({
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
-  }, [showRules]);
+  }, []);
 
   const readyCount = roster.filter((c) => c.level >= BATTLE_READY_LEVEL).length;
 
-  const sortedRoster = [...roster].sort((a, b) => {
-    if (b.level !== a.level) return b.level - a.level;
-    return a.name.localeCompare(b.name);
-  });
-
-  const handleSmartQuerySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Build live instant suggestions across Bosses, Regions, Characters, and Reactions
+  const suggestions = useMemo<OmniboxSuggestion[]>(() => {
     const q = queryText.trim().toLowerCase();
-    if (!q) return;
 
-    // 1. Check direct region preset match first (e.g., "Snezhnaya", "Dragonspine", "Enkanomiya")
-    const matchedPreset = presets.find(
-      (p) =>
-        p.region.toLowerCase().includes(q) ||
-        q.includes(p.region.split('(')[0].trim().toLowerCase())
-    );
-    if (matchedPreset) {
-      onSelectRegion(matchedPreset.id);
-      return;
+    if (!q) {
+      // Curated quick-launch suggestions when clicking into Search
+      const quick: OmniboxSuggestion[] = [];
+      const wavebinder = ENCOUNTERS.find((e) => e.id === 'wavebinder');
+      if (wavebinder) {
+        quick.push({
+          kind: 'boss',
+          id: `boss-${wavebinder.id}`,
+          title: wavebinder.name,
+          subtitle: 'Snezhnaya ✦ Drops for Mitya',
+          region: wavebinder.region,
+          encounterId: wavebinder.id,
+        });
+      }
+      const snezhnaya = presets.find((p) =>
+        p.region.toLowerCase().includes('snezhnaya')
+      );
+      if (snezhnaya) {
+        quick.push({
+          kind: 'region',
+          id: `region-${snezhnaya.id}`,
+          title: snezhnaya.region,
+          subtitle: snezhnaya.teamName,
+          region: snezhnaya.region,
+          presetId: snezhnaya.id,
+        });
+      }
+      ARCHETYPES.slice(0, 3).forEach((arch) => {
+        quick.push({
+          kind: 'archetype',
+          id: `arch-${arch.id}`,
+          title: arch.name,
+          subtitle: arch.summary,
+          archetypeId: arch.id,
+        });
+      });
+      const mitya = roster.find((c) => c.name.toLowerCase() === 'mitya');
+      if (mitya) {
+        quick.push({
+          kind: 'character',
+          id: `char-${mitya.id}`,
+          title: `Build around ${mitya.name}`,
+          subtitle: `Lv ${mitya.level} ${mitya.element} ✦ ${mitya.specialMechanic}`,
+          character: mitya,
+        });
+      }
+      return quick;
     }
 
-    // 2. Match archetype, encounter, or character locally
-    const matchedArchetype = ARCHETYPES.find(
-      (a) =>
-        q.includes(a.name.toLowerCase()) ||
-        q.includes(a.id.replace(/-/g, ' ')) ||
-        (q.includes('stellar') && a.id === 'stellar-conduct') ||
-        (q.includes('conduct') && a.id === 'stellar-conduct') ||
-        (q.includes('overload') && a.id === 'overloaded-chevreuse') ||
-        (q.includes('crystallize') && a.id === 'lunar-crystallize') ||
-        (q.includes('lunar charged') && a.id === 'lunar-charged') ||
-        (q.includes('lunar bloom') && a.id === 'lunar-bloom')
-    );
+    const out: OmniboxSuggestion[] = [];
 
-    const matchedEncounter = ENCOUNTERS.find(
-      (enc) =>
-        enc.keywords.some((kw) => q.includes(kw)) ||
-        q.includes(enc.region.toLowerCase())
-    );
+    // 1. Bosses (name, region, keywords, or character drop name)
+    for (const enc of ENCOUNTERS) {
+      const hit =
+        enc.name.toLowerCase().includes(q) ||
+        enc.region.toLowerCase().includes(q) ||
+        enc.keywords.some((k) => k.includes(q)) ||
+        (enc.dropsFor?.some((d) => d.toLowerCase().includes(q)) ?? false);
+      if (hit) {
+        const dropNote =
+          enc.dropsFor && enc.dropsFor.length > 0
+            ? ` ✦ Drops for ${enc.dropsFor.join(', ')}`
+            : '';
+        out.push({
+          kind: 'boss',
+          id: `boss-${enc.id}`,
+          title: enc.name,
+          subtitle: `${enc.region} Boss${dropNote}`,
+          region: enc.region,
+          encounterId: enc.id,
+        });
+      }
+      if (out.length >= 4) break;
+    }
 
-    const matchedChar = roster.find((c) => q.includes(c.name.toLowerCase()));
+    // 2. Regions
+    let regionHits = 0;
+    for (const preset of presets) {
+      if (
+        preset.region.toLowerCase().includes(q) ||
+        preset.teamName.toLowerCase().includes(q)
+      ) {
+        out.push({
+          kind: 'region',
+          id: `region-${preset.id}`,
+          title: preset.region,
+          subtitle: preset.teamName,
+          region: preset.region,
+          presetId: preset.id,
+        });
+        regionHits++;
+        if (regionHits >= 3) break;
+      }
+    }
 
-    if (matchedArchetype || matchedEncounter || matchedChar) {
+    // 3. Characters
+    let charHits = 0;
+    const sortedRoster = [...roster].sort((a, b) => b.level - a.level);
+    for (const c of sortedRoster) {
+      if (
+        c.name.toLowerCase().includes(q) ||
+        c.element.toLowerCase().includes(q) ||
+        c.specialMechanic.toLowerCase().includes(q)
+      ) {
+        out.push({
+          kind: 'character',
+          id: `char-${c.id}`,
+          title: c.name,
+          subtitle: `Lv ${c.level} ${c.element} ✦ ${c.role.split('/')[0].trim()}`,
+          character: c,
+        });
+        charHits++;
+        if (charHits >= 4) break;
+      }
+    }
+
+    // 4. Reaction Archetypes
+    for (const arch of ARCHETYPES) {
+      if (
+        arch.name.toLowerCase().includes(q) ||
+        arch.summary.toLowerCase().includes(q) ||
+        arch.id.replace(/-/g, ' ').includes(q)
+      ) {
+        out.push({
+          kind: 'archetype',
+          id: `arch-${arch.id}`,
+          title: arch.name,
+          subtitle: arch.summary,
+          archetypeId: arch.id,
+        });
+      }
+    }
+
+    return out.slice(0, 8);
+  }, [queryText, presets, roster]);
+
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [queryText]);
+
+  const applySuggestion = (item: OmniboxSuggestion) => {
+    setIsOpen(false);
+    setQueryText('');
+    if (item.kind === 'region') {
+      onSelectRegion(item.presetId);
+      return;
+    }
+    if (item.kind === 'boss') {
       onChangeFilters({
         ...filters,
-        archetypeId: matchedArchetype ? matchedArchetype.id : filters.archetypeId,
-        encounterId: matchedEncounter ? matchedEncounter.id : filters.encounterId,
-        anchorCharacterId: matchedChar ? matchedChar.id : filters.anchorCharacterId,
+        archetypeId: null,
+        encounterId: item.encounterId,
+        anchorCharacterId: null,
+      });
+      return;
+    }
+    if (item.kind === 'archetype') {
+      onChangeFilters({
+        ...filters,
+        archetypeId: item.archetypeId,
+        encounterId: null,
+        anchorCharacterId: null,
         includeUnbuilt:
-          (matchedChar && matchedChar.level < BATTLE_READY_LEVEL) ||
-          matchedArchetype?.id === 'overloaded-chevreuse' ||
-          matchedArchetype?.id === 'nightsoul-geo' ||
-          matchedArchetype?.id === 'arkhe-ousia'
+          item.archetypeId === 'overloaded-chevreuse' ||
+          item.archetypeId === 'nightsoul-geo' ||
+          item.archetypeId === 'arkhe-ousia'
             ? true
             : filters.includeUnbuilt,
       });
       return;
     }
+    if (item.kind === 'character') {
+      onChangeFilters({
+        ...filters,
+        archetypeId: null,
+        encounterId: null,
+        anchorCharacterId: item.character.id,
+        includeUnbuilt:
+          item.character.level < BATTLE_READY_LEVEL
+            ? true
+            : filters.includeUnbuilt,
+      });
+    }
+  };
 
-    if (hasGeminiKey) {
+  const handleSmartQuerySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (suggestions.length > 0 && queryText.trim()) {
+      applySuggestion(suggestions[Math.min(activeIdx, suggestions.length - 1)]);
+      return;
+    }
+    if (hasGeminiKey && queryText.trim()) {
+      setIsOpen(false);
       onAskGemini(queryText.trim());
     }
   };
@@ -131,25 +325,108 @@ export function FilterPanel({
     Boolean(filters.encounterId) ||
     Boolean(filters.anchorCharacterId);
 
-  const nonDefaultRules =
-    filters.includeUnbuilt || !filters.requireSurvivability;
+  const activeAnchorChar = filters.anchorCharacterId
+    ? roster.find((c) => c.id === filters.anchorCharacterId) ?? null
+    : null;
+  const activeArch = filters.archetypeId
+    ? ARCHETYPES.find((a) => a.id === filters.archetypeId) ?? null
+    : null;
 
   return (
     <div>
       <form className="command-bar" onSubmit={handleSmartQuerySubmit}>
-        <div className="command-search-wrap">
+        {/* Instant ⌘K Omnibox across Bosses, Regions, Characters & Reactions */}
+        <div className="command-search-wrap" ref={searchRef}>
           <Search size={15} className="command-search-icon" />
           <input
+            ref={inputRef}
             id="guru-query-input"
             type="text"
             className="command-input"
+            style={{ paddingRight: 44 }}
             value={queryText}
-            onChange={(e) => setQueryText(e.target.value)}
-            placeholder="Search region, reaction, or boss — e.g. Snezhnaya, Stellar-Conduct…"
+            onFocus={() => setIsOpen(true)}
+            onChange={(e) => {
+              setQueryText(e.target.value);
+              setIsOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (!isOpen) return;
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActiveIdx((i) =>
+                  suggestions.length > 0 ? (i + 1) % suggestions.length : 0
+                );
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActiveIdx((i) =>
+                  suggestions.length > 0
+                    ? (i - 1 + suggestions.length) % suggestions.length
+                    : 0
+                );
+              } else if (e.key === 'Escape') {
+                setIsOpen(false);
+                inputRef.current?.blur();
+              }
+            }}
+            placeholder="Jump to any boss, region, character, or reaction…"
+            autoComplete="off"
           />
+          <kbd className="kbd-hint" aria-hidden="true">
+            ⌘K
+          </kbd>
+
+          {isOpen && suggestions.length > 0 && (
+            <div className="omnibox-dropdown" role="listbox">
+              <div className="omnibox-header">
+                {queryText.trim() ? 'Instant Matches' : 'Quick Jump'}
+              </div>
+              {suggestions.map((item, idx) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === activeIdx}
+                  className={`omnibox-item ${idx === activeIdx ? 'active' : ''}`}
+                  onMouseEnter={() => setActiveIdx(idx)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    applySuggestion(item);
+                  }}
+                >
+                  <span className="omnibox-icon">
+                    {item.kind === 'character' ? (
+                      <CharacterPortrait character={item.character} size={28} />
+                    ) : item.kind === 'archetype' ? (
+                      <PrimogemStar size={14} color="var(--gold-bright)" />
+                    ) : (
+                      <NationEmblem
+                        nation={item.region}
+                        size={16}
+                        color="var(--gold-bright)"
+                      />
+                    )}
+                  </span>
+                  <span className="omnibox-copy">
+                    <span className="omnibox-title">{item.title}</span>
+                    <span className="omnibox-sub">{item.subtitle}</span>
+                  </span>
+                  <span className="omnibox-kind">
+                    {item.kind === 'boss'
+                      ? 'Boss'
+                      : item.kind === 'region'
+                        ? 'Region'
+                        : item.kind === 'character'
+                          ? 'Anchor'
+                          : 'Reaction'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Region Dropdown -> Immediately loads that region's team into the Team Circle */}
+        {/* Region Preset Dropdown (user-requested quick jump) */}
         <select
           id="region-select"
           aria-label="Select Region Team"
@@ -165,49 +442,22 @@ export function FilterPanel({
           ))}
         </select>
 
-        <select
-          id="archetype-select"
-          aria-label="Reaction or Mechanic Style"
-          className={`inline-select ${
-            !selectedRegionId && filters.archetypeId ? 'active-filter' : ''
-          }`}
-          value={selectedRegionId ? '' : filters.archetypeId ?? ''}
-          onChange={(e) => {
-            const nextId = e.target.value || null;
-            const needsUnbuilt =
-              nextId === 'overloaded-chevreuse' ||
-              nextId === 'nightsoul-geo' ||
-              nextId === 'arkhe-ousia';
-            onChangeFilters({
-              ...filters,
-              archetypeId: nextId,
-              includeUnbuilt: needsUnbuilt ? true : filters.includeUnbuilt,
-            });
-          }}
-        >
-          <option value="">Reaction Style…</option>
-          {ARCHETYPES.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-
+        {/* Boss Counter Dropdown */}
         <select
           id="encounter-select"
-          aria-label="Boss or Encounter Counter"
-          className={`inline-select ${
-            !selectedRegionId && filters.encounterId ? 'active-filter' : ''
-          }`}
-          value={selectedRegionId ? '' : filters.encounterId ?? ''}
+          aria-label="Boss or Encounter"
+          className={`inline-select ${filters.encounterId ? 'active-filter' : ''}`}
+          value={filters.encounterId ?? ''}
           onChange={(e) =>
             onChangeFilters({
               ...filters,
+              archetypeId: null,
+              anchorCharacterId: null,
               encounterId: e.target.value || null,
             })
           }
         >
-          <option value="">Boss / Encounter…</option>
+          <option value="">Boss Counter…</option>
           {ENCOUNTERS.map((enc) => (
             <option key={enc.id} value={enc.id}>
               {enc.name}
@@ -215,47 +465,26 @@ export function FilterPanel({
           ))}
         </select>
 
-        <select
-          id="anchor-select"
-          aria-label="Anchor Character"
-          className={`inline-select ${
-            !selectedRegionId && filters.anchorCharacterId ? 'active-filter' : ''
-          }`}
-          value={selectedRegionId ? '' : filters.anchorCharacterId ?? ''}
-          onChange={(e) => {
-            const nextId = e.target.value || null;
-            const chosen = roster.find((c) => c.id === nextId);
-            onChangeFilters({
-              ...filters,
-              anchorCharacterId: nextId,
-              includeUnbuilt:
-                chosen && chosen.level < BATTLE_READY_LEVEL
-                  ? true
-                  : filters.includeUnbuilt,
-            });
-          }}
-        >
-          <option value="">Build Around…</option>
-          {sortedRoster.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} (Lv {c.level})
-            </option>
-          ))}
-        </select>
+        {/* Quiet active badge when anchored by character or reaction via omnibox/roster */}
+        {(activeAnchorChar || activeArch) && (
+          <span className="active-scope-tag">
+            {activeAnchorChar
+              ? `Anchor: ${activeAnchorChar.name}`
+              : activeArch?.name}
+          </span>
+        )}
 
-        {/* Secondary rules tucked in a calm popover */}
+        {/* Secondary Rules Popover (Sustain & Gemini AI) */}
         <div className="popover-anchor" ref={popoverRef}>
           <button
             id="btn-rules-popover"
             type="button"
-            className={`ghost-action ${nonDefaultRules ? 'accent' : ''}`}
+            className={`btn-subtle ${!filters.requireSurvivability ? 'active-filter' : ''}`}
             onClick={() => setShowRules((v) => !v)}
+            title="Survivability rule and optional Gemini advisor"
           >
-            <SlidersHorizontal size={14} />
-            <span>
-              {filters.includeUnbuilt ? 'Lv 1–90' : 'Lv 70+'}
-              {!filters.requireSurvivability ? ' · Glass' : ''}
-            </span>
+            <SlidersHorizontal size={13} />
+            <span>Rules</span>
           </button>
 
           {showRules && (
@@ -264,13 +493,10 @@ export function FilterPanel({
                 <div>
                   <div className="option-title">Include Unbuilt (Lv 1–69)</div>
                   <div className="option-sub">
-                    {filters.includeUnbuilt
-                      ? `All ${roster.length} chars included`
-                      : `Battle-Ready only (${readyCount} chars)`}
+                    {readyCount} of {roster.length} characters are Lv 70+
                   </div>
                 </div>
                 <button
-                  id="toggle-include-unbuilt"
                   type="button"
                   role="switch"
                   aria-checked={filters.includeUnbuilt}
@@ -288,13 +514,10 @@ export function FilterPanel({
                 <div>
                   <div className="option-title">Require Healer or Shielder</div>
                   <div className="option-sub">
-                    {filters.requireSurvivability
-                      ? 'Sustain guaranteed in every team'
-                      : 'Glass Cannon / Max DPS allowed'}
+                    Ensures comfortable Abyss survivability
                   </div>
                 </div>
                 <button
-                  id="toggle-require-sustain"
                   type="button"
                   role="switch"
                   aria-checked={filters.requireSurvivability}
@@ -310,43 +533,39 @@ export function FilterPanel({
 
               <hr className="hairline" />
 
-              <button
-                id="btn-ask-gemini"
-                type="button"
-                className="btn-subtle"
-                style={{ width: '100%', justifyContent: 'center' }}
-                disabled={isAskingGemini}
-                onClick={() => {
-                  setShowRules(false);
-                  if (!hasGeminiKey) {
-                    onOpenSettings();
-                  } else if (queryText.trim()) {
+              {hasGeminiKey ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={isAskingGemini || !queryText.trim()}
+                  onClick={() => {
+                    setShowRules(false);
                     onAskGemini(queryText.trim());
-                  }
-                }}
-              >
-                <Wand2 size={13} />
-                {isAskingGemini
-                  ? 'Asking Gemini…'
-                  : hasGeminiKey
-                    ? 'Ask Gemini with search query'
-                    : 'Connect Gemini API for freeform Q&A'}
-              </button>
+                  }}
+                >
+                  <Wand2 size={13} />
+                  {isAskingGemini
+                    ? 'Asking Gemini…'
+                    : 'Ask Gemini about search query'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="ghost-action"
+                  style={{ padding: 0, fontSize: 12 }}
+                  onClick={() => {
+                    setShowRules(false);
+                    onOpenSettings();
+                  }}
+                >
+                  <Wand2 size={13} />
+                  Add optional Gemini API key in Settings
+                </button>
+              )}
             </div>
           )}
         </div>
-
-        {queryText.trim() && hasGeminiKey && (
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={isAskingGemini}
-            onClick={() => onAskGemini(queryText.trim())}
-          >
-            <Wand2 size={13} />
-            {isAskingGemini ? 'Thinking…' : 'Ask Gemini'}
-          </button>
-        )}
 
         {hasActiveFilters && (
           <button
@@ -362,18 +581,16 @@ export function FilterPanel({
                 anchorCharacterId: null,
               });
             }}
-            title="Clear filters"
+            title="Clear current selection"
           >
             <RotateCcw size={13} />
+            Reset
           </button>
         )}
       </form>
 
       {geminiError && (
-        <div
-          className="note-line danger"
-          style={{ marginTop: -14, marginBottom: 14 }}
-        >
+        <div className="note-line danger" style={{ marginBottom: 16 }}>
           {geminiError}
         </div>
       )}

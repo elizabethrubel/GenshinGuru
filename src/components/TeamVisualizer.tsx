@@ -1,18 +1,30 @@
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowUpRight,
   Bookmark,
   ClipboardCopy,
   Swords,
 } from 'lucide-react';
-import type { Character, SlotRole, TeamRecommendation } from '../types/genshin';
+import type {
+  ActiveTab,
+  Character,
+  SlotRole,
+  TeamRecommendation,
+} from '../types/genshin';
 import { analyzeTeam, inferSlotRoles } from '../engine/teamAnalyzer';
 import { getContextualBuildCallouts } from '../engine/buildPriorities';
 import { CharacterPortrait } from './CharacterPortrait';
 import { PrimogemStar } from './NationEmblem';
 import { SlotSwapDrawer } from './SlotSwapDrawer';
 import { getEdgeColor, TeamCircle } from './TeamCircle';
+
+export interface OriginContext {
+  fromTab: ActiveTab;
+  label: string;
+  detail?: string;
+}
 
 interface TeamVisualizerProps {
   recommendations: TeamRecommendation[];
@@ -25,9 +37,12 @@ interface TeamVisualizerProps {
   ];
   hasActiveSelection: boolean;
   activeRegionName?: string | null;
+  originContext?: OriginContext | null;
+  onReturnToOrigin?: () => void;
   burstSignal?: number;
   onSelectRecommendation: (rec: TeamRecommendation) => void;
   onSwapSlot: (slotIndex: number, nextChar: Character) => void;
+  onInspectCharacter: (char: Character) => void;
   onFatesPick: () => void;
   roster: Character[];
   includeUnbuilt: boolean;
@@ -43,9 +58,12 @@ export function TeamVisualizer({
   manualSlots,
   hasActiveSelection,
   activeRegionName,
+  originContext,
+  onReturnToOrigin,
   burstSignal = 0,
   onSelectRecommendation,
   onSwapSlot,
+  onInspectCharacter,
   onFatesPick,
   roster,
   includeUnbuilt,
@@ -241,19 +259,49 @@ export function TeamVisualizer({
             </div>
           ) : isNoFilterMatch ? (
             <div>
+              {originContext && onReturnToOrigin && (
+                <button
+                  type="button"
+                  className="origin-breadcrumb"
+                  onClick={onReturnToOrigin}
+                >
+                  <ArrowLeft size={13} />
+                  <span>Back to {originContext.label}</span>
+                  {originContext.detail && (
+                    <span className="origin-breadcrumb-detail">
+                      ✦ {originContext.detail}
+                    </span>
+                  )}
+                </button>
+              )}
               <h2 className="editorial-title" style={{ fontSize: 22 }}>
                 No Battle-Ready team matches these filters
               </h2>
               <p className="editorial-prose" style={{ marginTop: 8 }}>
-                Open the <strong>Lv 70+</strong> menu in the top bar and enable{' '}
-                <strong>Include Unbuilt (Lv 1–69)</strong> to unlock specialist
-                characters like Alyosha, Mitya, Chevreuse, or Kachina.
+                Toggle <strong>Pool: Lv 70+</strong> in the top bar to{' '}
+                <strong>Lv 1–90</strong> to unlock specialist characters like
+                Alyosha, Mitya, Chevreuse, or Kachina.
               </p>
             </div>
           ) : (
             <>
               <div>
-                {activeRegionName && (
+                {originContext && onReturnToOrigin && (
+                  <button
+                    type="button"
+                    className="origin-breadcrumb"
+                    onClick={onReturnToOrigin}
+                  >
+                    <ArrowLeft size={13} />
+                    <span>Back to {originContext.label}</span>
+                    {originContext.detail && (
+                      <span className="origin-breadcrumb-detail">
+                        ✦ {originContext.detail}
+                      </span>
+                    )}
+                  </button>
+                )}
+                {activeRegionName && !originContext && (
                   <div
                     className="section-kicker"
                     style={{ color: 'var(--gold)', marginBottom: 4 }}
@@ -410,12 +458,20 @@ export function TeamVisualizer({
                         className="note-line warn"
                         style={{ justifyContent: 'space-between' }}
                       >
-                        <div
+                        <button
+                          type="button"
+                          onClick={() => onInspectCharacter(call.character)}
+                          title={`Inspect ${call.character.name}'s artifacts & boss`}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 12,
                             minWidth: 0,
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            textAlign: 'left',
+                            color: 'inherit',
                           }}
                         >
                           <CharacterPortrait
@@ -434,7 +490,7 @@ export function TeamVisualizer({
                               {call.reason}
                             </div>
                           </div>
-                        </div>
+                        </button>
 
                         {!call.inTeamAlready && (
                           <button
@@ -527,6 +583,7 @@ export function TeamVisualizer({
               ? `Swap ${circleSlots[swappingSlot]!.name}`
               : `Add Character to Slot ${swappingSlot + 1}`
           }
+          currentCharacter={circleSlots[swappingSlot] ?? null}
           currentMembers={filledMembers}
           slotIndex={(() => {
             const target = circleSlots[swappingSlot];
@@ -536,6 +593,7 @@ export function TeamVisualizer({
           roster={roster}
           includeUnbuilt={includeUnbuilt}
           onPickCharacter={(nextChar) => onSwapSlot(swappingSlot, nextChar)}
+          onInspectCharacter={onInspectCharacter}
           onClose={() => setSwappingSlot(null)}
         />
       )}
