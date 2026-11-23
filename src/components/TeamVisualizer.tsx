@@ -223,8 +223,9 @@ export function TeamVisualizer({
           )}
         </div>
 
-        {/* Right: Calm, Borderless Scrollable Editorial Readout */}
+        {/* Right: Calm, Borderless Scrollable Editorial Readout + Sticky Action Footer */}
         <section className="editorial-panel" aria-label="Team breakdown">
+          <div className="editorial-scroll">
           {isEmptyLanding ? (
             <div className="editorial-empty-center">
               <div>
@@ -557,76 +558,79 @@ export function TeamVisualizer({
                   </div>
                 </>
               )}
-
-              {/* Quiet Action Row when 4 members are placed */}
-              {effectiveTeam && (
-                <div className="editorial-actions">
-                  <button
-                    id="btn-save-team"
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => onSaveTeam(effectiveTeam)}
-                  >
-                    <Bookmark size={13} />
-                    Save Team
-                  </button>
-                  <button
-                    id="btn-fates-pick"
-                    type="button"
-                    className="btn-wish"
-                    onClick={
-                      recommendations.length > 1 ? onShuffleTeam : onFatesPick
-                    }
-                    title={
-                      recommendations.length > 1
-                        ? activeRegionName
-                          ? `Cycle through other strong teams for ${activeRegionName}`
-                          : 'Cycle through other strong alternative teams'
-                        : 'Draw another high-synergy party from your roster'
-                    }
-                  >
-                    {recommendations.length > 1 ? (
-                      <>
-                        <Shuffle size={12} />
-                        {activeRegionName
-                          ? `Shuffle ${activeRegionName.split('(')[0].trim()}`
-                          : 'Shuffle Alternatives'}
-                      </>
-                    ) : (
-                      <>
-                        <PrimogemStar size={12} />
-                        Fate&apos;s Pick
-                      </>
-                    )}
-                  </button>
-                  <button
-                    id="btn-copy-sheet-row"
-                    type="button"
-                    className="btn-subtle"
-                    onClick={() => onCopySheetRow(effectiveTeam)}
-                  >
-                    <ClipboardCopy size={13} />
-                    Copy Sheet Row
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-action"
-                    onClick={() => onSendToAbyss(effectiveTeam, 1)}
-                  >
-                    <Swords size={13} />
-                    Abyss 1
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-action"
-                    onClick={() => onSendToAbyss(effectiveTeam, 2)}
-                  >
-                    <Swords size={13} />
-                    Abyss 2
-                  </button>
-                </div>
-              )}
             </>
+          )}
+          </div>
+
+          {/* Pinned Sticky Action Footer — always visible above the fold */}
+          {!isEmptyLanding && !isNoFilterMatch && effectiveTeam && (
+            <div className="editorial-footer">
+              <div className="editorial-actions">
+                <button
+                  id="btn-save-team"
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => onSaveTeam(effectiveTeam)}
+                >
+                  <Bookmark size={13} />
+                  Save Team
+                </button>
+                <button
+                  id="btn-fates-pick"
+                  type="button"
+                  className="btn-wish"
+                  onClick={
+                    recommendations.length > 1 ? onShuffleTeam : onFatesPick
+                  }
+                  title={
+                    recommendations.length > 1
+                      ? activeRegionName
+                        ? `Cycle through other strong teams for ${activeRegionName}`
+                        : 'Cycle through other strong alternative teams'
+                      : 'Draw another high-synergy party from your roster'
+                  }
+                >
+                  {recommendations.length > 1 ? (
+                    <>
+                      <Shuffle size={12} />
+                      {activeRegionName
+                        ? `Shuffle ${activeRegionName.split('(')[0].trim()}`
+                        : 'Shuffle Alternatives'}
+                    </>
+                  ) : (
+                    <>
+                      <PrimogemStar size={12} />
+                      Fate&apos;s Pick
+                    </>
+                  )}
+                </button>
+                <button
+                  id="btn-copy-sheet-row"
+                  type="button"
+                  className="btn-subtle"
+                  onClick={() => onCopySheetRow(effectiveTeam)}
+                >
+                  <ClipboardCopy size={13} />
+                  Copy Row
+                </button>
+                <button
+                  type="button"
+                  className="ghost-action"
+                  onClick={() => onSendToAbyss(effectiveTeam, 1)}
+                >
+                  <Swords size={13} />
+                  Abyss 1
+                </button>
+                <button
+                  type="button"
+                  className="ghost-action"
+                  onClick={() => onSendToAbyss(effectiveTeam, 2)}
+                >
+                  <Swords size={13} />
+                  Abyss 2
+                </button>
+              </div>
+            </div>
           )}
         </section>
       </div>
