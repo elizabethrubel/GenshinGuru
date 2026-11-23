@@ -1,40 +1,46 @@
 :root {
-  /* Calm Celestial Obsidian Canvas */
-  --bg: #0b1019;
-  --bg-elevated: #111826;
-  --bg-subtle: rgba(255, 255, 255, 0.035);
-  --bg-hover: rgba(255, 255, 255, 0.065);
-  --bg-modal: #101622;
+  /* Velvet Teyvat Twilight Canvas */
+  --bg: #101526;
+  --bg-elevated: #171e35;
+  --bg-subtle: rgba(246, 240, 228, 0.042);
+  --bg-hover: rgba(246, 240, 228, 0.075);
+  --bg-modal: #13192e;
 
-  /* Hairlines — never loud boxes */
-  --hairline: rgba(235, 228, 212, 0.09);
-  --hairline-strong: rgba(235, 228, 212, 0.17);
-  --gold: #d9b878;
-  --gold-bright: #efd49d;
-  --gold-dim: rgba(217, 184, 120, 0.26);
+  /* Filigree Hairlines — never loud boxes */
+  --hairline: rgba(236, 223, 195, 0.105);
+  --hairline-strong: rgba(236, 223, 195, 0.21);
+  --gold: #e5c687;
+  --gold-bright: #f6e0ae;
+  --gold-dim: rgba(229, 198, 135, 0.32);
 
-  /* Typography */
-  --text: #f3efe6;
-  --text-2: #a5b2c6;
-  --text-3: #6c7b93;
+  /* 5★ Wishing Gold & 4★ Twilight Amethyst Rarity Accents */
+  --rarity-5: #efc97d;
+  --rarity-4: #a892e6;
+
+  /* Parchment Ivory Typography */
+  --text: #f6f0e4;
+  --text-2: #b2bdd4;
+  --text-3: #7685a3;
 
   /* Refined Genshin Element Colors */
   --el-cryo: #7fd4fc;
-  --el-electro: #a5b0e3;
-  --el-pyro: #f28865;
-  --el-geo: #e8c36c;
-  --el-dendro: #7dca73;
-  --el-hydro: #53ace0;
-  --el-anemo: #62e5cf;
+  --el-electro: #b39ff2;
+  --el-pyro: #f48b66;
+  --el-geo: #edc86e;
+  --el-dendro: #7ed176;
+  --el-hydro: #5ab4eb;
+  --el-anemo: #66e6d0;
 
   /* Reaction & Status Colors */
   --stellar: #8ce2f7;
-  --lunar: #e7cb8d;
-  --ok: #6cc996;
-  --warn: #ebb86b;
-  --danger: #e47878;
+  --lunar: #f2d593;
+  --ok: #72cf9c;
+  --warn: #f0be6e;
+  --danger: #e87c7c;
 
   --font: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Cinzel', Georgia, serif;
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 *,
@@ -50,8 +56,9 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse 65% 45% at 32% 38%, rgba(217, 184, 120, 0.045), transparent 65%),
-    radial-gradient(ellipse 55% 45% at 78% 12%, rgba(83, 172, 224, 0.045), transparent 60%);
+    radial-gradient(ellipse 70% 50% at 24% 26%, rgba(229, 198, 135, 0.06), transparent 64%),
+    radial-gradient(ellipse 60% 48% at 82% 10%, rgba(114, 152, 232, 0.08), transparent 60%),
+    linear-gradient(180deg, #131930 0%, #0e1323 55%, #0c101e 100%);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
@@ -59,6 +66,28 @@ body {
   line-height: 1.55;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Whisper-faint celestial starfield across the upper sky */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.42;
+  background-image:
+    radial-gradient(1.2px 1.2px at 11% 14%, rgba(246, 224, 174, 0.8), transparent),
+    radial-gradient(1px 1px at 26% 8%, rgba(246, 240, 228, 0.65), transparent),
+    radial-gradient(1.5px 1.5px at 42% 19%, rgba(140, 226, 247, 0.7), transparent),
+    radial-gradient(1px 1px at 61% 11%, rgba(246, 224, 174, 0.75), transparent),
+    radial-gradient(1.2px 1.2px at 78% 22%, rgba(246, 240, 228, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 89% 9%, rgba(246, 224, 174, 0.7), transparent),
+    radial-gradient(1px 1px at 18% 36%, rgba(246, 240, 228, 0.45), transparent),
+    radial-gradient(1.2px 1.2px at 54% 31%, rgba(246, 224, 174, 0.5), transparent),
+    radial-gradient(1px 1px at 93% 34%, rgba(140, 226, 247, 0.55), transparent),
+    radial-gradient(1px 1px at 7% 58%, rgba(246, 224, 174, 0.35), transparent),
+    radial-gradient(1.2px 1.2px at 72% 48%, rgba(246, 240, 228, 0.35), transparent);
 }
 
 button,
@@ -81,7 +110,7 @@ button {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(229, 198, 135, 0.16);
   border-radius: 999px;
 }
 
@@ -102,20 +131,46 @@ button {
 .el-text-Hydro { color: var(--el-hydro); }
 .el-text-Anemo { color: var(--el-anemo); }
 
-/* App Shell */
+/* App Shell + Dynamic Ambient Elemental Sky Wash */
 .app-shell {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  --ambient-rgb: 229, 198, 135;
 }
 
-/* Whisper-Quiet Header */
+.app-shell[data-ambient='Cryo'] { --ambient-rgb: 127, 212, 252; }
+.app-shell[data-ambient='Electro'] { --ambient-rgb: 179, 159, 242; }
+.app-shell[data-ambient='Pyro'] { --ambient-rgb: 244, 139, 102; }
+.app-shell[data-ambient='Geo'] { --ambient-rgb: 237, 200, 110; }
+.app-shell[data-ambient='Dendro'] { --ambient-rgb: 126, 209, 118; }
+.app-shell[data-ambient='Hydro'] { --ambient-rgb: 90, 180, 235; }
+.app-shell[data-ambient='Anemo'] { --ambient-rgb: 102, 230, 208; }
+
+.app-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 58% 48% at 28% 42%,
+    rgba(var(--ambient-rgb), 0.115) 0%,
+    rgba(var(--ambient-rgb), 0.03) 42%,
+    transparent 70%
+  );
+  transition: background 1.1s ease;
+}
+
+/* Whisper-Quiet Celestial Header */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(11, 16, 25, 0.84);
-  backdrop-filter: blur(16px);
+  background: rgba(16, 21, 38, 0.82);
+  backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -123,7 +178,7 @@ button {
   max-width: 1320px;
   margin: 0 auto;
   padding: 0 28px;
-  height: 60px;
+  height: 62px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -141,22 +196,30 @@ button {
 }
 
 .brand-dot {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 1px solid var(--gold-dim);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--gold-bright);
-  background: rgba(217, 184, 120, 0.08);
+  background: radial-gradient(circle, rgba(229, 198, 135, 0.18) 0%, rgba(229, 198, 135, 0.04) 70%);
+  box-shadow: 0 0 16px rgba(229, 198, 135, 0.16);
+  transition: transform 0.55s var(--spring), box-shadow 0.3s ease;
+}
+
+.brand-mark:hover .brand-dot {
+  transform: rotate(90deg) scale(1.06);
+  box-shadow: 0 0 22px rgba(246, 224, 174, 0.32);
 }
 
 .brand-name {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.045em;
   color: var(--text);
 }
 
@@ -179,7 +242,7 @@ button {
   font-size: 13.5px;
   font-weight: 500;
   color: var(--text-3);
-  transition: color 0.16s ease;
+  transition: color 0.2s var(--spring);
 }
 
 .nav-link:hover {
@@ -187,7 +250,7 @@ button {
 }
 
 .nav-link.active {
-  color: var(--text);
+  color: var(--gold-bright);
   font-weight: 600;
 }
 
@@ -198,8 +261,20 @@ button {
   right: 0;
   bottom: -1px;
   height: 2px;
-  background: var(--gold);
-  border-radius: 2px 2px 0 0;
+  background: linear-gradient(90deg, transparent, var(--gold-bright), transparent);
+  border-radius: 2px;
+}
+
+.nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 5px;
+  height: 5px;
+  background: var(--gold-bright);
+  transform: translateX(-50%) rotate(45deg);
+  box-shadow: 0 0 8px rgba(246, 224, 174, 0.7);
 }
 
 .header-tools {
@@ -505,10 +580,12 @@ button {
 }
 
 .circle-center-score {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--gold-bright);
+  text-shadow: 0 0 22px rgba(246, 224, 174, 0.25);
   line-height: 1;
 }
 
@@ -516,7 +593,7 @@ button {
   font-size: 11px;
   font-weight: 600;
   color: var(--gold-bright);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   line-height: 1.25;
 }
 
@@ -524,7 +601,7 @@ button {
   font-size: 11px;
   color: var(--text-2);
   line-height: 1.3;
-  max-width: 140px;
+  max-width: 146px;
 }
 
 /* Character Portrait Medallions on the Ring */
@@ -538,41 +615,47 @@ button {
   background: none;
   border: none;
   padding: 0;
-  transition: transform 0.18s ease, opacity 0.2s ease;
+  transition: transform 0.28s var(--spring), opacity 0.22s ease;
   z-index: 5;
 }
 
 .circle-node:hover {
-  transform: translate(-50%, -50%) scale(1.05);
+  transform: translate(-50%, -50%) scale(1.065);
 }
 
 .circle-node.dimmed {
-  opacity: 0.35;
+  opacity: 0.34;
 }
 
 .circle-node-ring {
   position: relative;
   border-radius: 999px;
   padding: 3px;
-  background: linear-gradient(145deg, var(--el, var(--gold)), rgba(255, 255, 255, 0.08));
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.2s ease;
+  background: linear-gradient(145deg, var(--el, var(--gold)), rgba(246, 240, 228, 0.12));
+  box-shadow:
+    0 12px 28px rgba(5, 8, 18, 0.56),
+    0 0 18px color-mix(in srgb, var(--el, var(--gold)) 22%, transparent);
+  transition: box-shadow 0.28s var(--spring), transform 0.28s var(--spring);
 }
 
 .circle-node:hover .circle-node-ring,
 .circle-node.highlighted .circle-node-ring {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.58), 0 0 0 3px rgba(217, 184, 120, 0.32);
+  box-shadow:
+    0 12px 32px rgba(5, 8, 18, 0.64),
+    0 0 0 2.5px rgba(246, 224, 174, 0.45),
+    0 0 28px color-mix(in srgb, var(--el, var(--gold)) 42%, transparent);
 }
 
 .circle-node-el-dot {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -1px;
+  right: -1px;
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: var(--bg);
-  border: 1px solid var(--hairline-strong);
+  background: #131a2f;
+  border: 1px solid color-mix(in srgb, var(--el, var(--gold)) 52%, rgba(246, 240, 228, 0.25));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -586,14 +669,14 @@ button {
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 999px;
-  background: #101724;
+  background: #131a2f;
   border: 1px solid var(--hairline-strong);
   color: var(--text);
 }
 
 .circle-node-lv.unbuilt {
   color: var(--warn);
-  border-color: rgba(235, 184, 107, 0.45);
+  border-color: rgba(240, 190, 110, 0.5);
 }
 
 .circle-node-caption {
@@ -601,7 +684,7 @@ button {
   flex-direction: column;
   align-items: center;
   line-height: 1.2;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 2px 12px rgba(6, 9, 20, 0.95);
 }
 
 .circle-node-name {
@@ -622,30 +705,52 @@ button {
   width: 72px;
   height: 72px;
   border-radius: 999px;
-  border: 1.5px dashed var(--hairline-strong);
-  background: rgba(16, 22, 34, 0.72);
+  border: 1.5px dashed rgba(229, 198, 135, 0.28);
+  background: radial-gradient(circle, rgba(23, 30, 53, 0.8) 0%, rgba(16, 21, 38, 0.85) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-3);
-  transition: all 0.16s ease;
+  transition: all 0.24s var(--spring);
 }
 
 .circle-node:hover .circle-empty-ring {
-  border-color: var(--gold);
+  border-color: var(--gold-bright);
   color: var(--gold-bright);
+  box-shadow: 0 0 22px rgba(229, 198, 135, 0.22);
 }
 
-/* Portrait Component with Layered Elemental Sign Fallback */
+/* Portrait Component with Layered Elemental Sign Fallback & 5★ / 4★ Rarity Sheen */
 .portrait-img-wrap {
   position: relative;
   border-radius: 999px;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 35%, #233048 0%, #141d2e 100%);
+  background: radial-gradient(circle at 50% 35%, #273354 0%, #161d34 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: box-shadow 0.25s var(--spring), transform 0.25s var(--spring);
+}
+
+.portrait-img-wrap.rarity-5 {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(239, 201, 125, 0.52),
+    0 2px 10px rgba(239, 201, 125, 0.12);
+}
+
+.portrait-img-wrap.rarity-4 {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(168, 146, 230, 0.44),
+    0 2px 10px rgba(168, 146, 230, 0.1);
+}
+
+.roster-item:hover .portrait-img-wrap,
+.region-portrait-item:hover .portrait-img-wrap {
+  box-shadow:
+    inset 0 0 0 1.5px var(--el, var(--gold-bright)),
+    0 0 18px color-mix(in srgb, var(--el, var(--gold)) 36%, transparent);
+  transform: scale(1.04);
 }
 
 .portrait-sign-fallback {
@@ -688,18 +793,19 @@ button {
   color: var(--text-2);
   font-size: 12.5px;
   font-weight: 500;
-  transition: all 0.16s ease;
+  transition: all 0.2s var(--spring);
 }
 
 .alt-team-btn:hover {
   background: var(--bg-subtle);
   color: var(--text);
+  transform: translateY(-1px);
 }
 
 .alt-team-btn.active {
-  background: rgba(217, 184, 120, 0.09);
+  background: rgba(229, 198, 135, 0.11);
   border-color: var(--gold-dim);
-  color: var(--text);
+  color: var(--gold-bright);
   font-weight: 600;
 }
 
@@ -726,10 +832,11 @@ button {
 
 .editorial-title {
   margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.18;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  line-height: 1.22;
   color: var(--text);
 }
 
@@ -744,7 +851,8 @@ button {
 }
 
 .meta-sep {
-  color: var(--text-3);
+  color: var(--gold-dim);
+  font-size: 10px;
 }
 
 .hairline {
@@ -1327,6 +1435,173 @@ button {
   font-size: 13px;
   color: var(--text-2);
   line-height: 1.5;
+}
+
+/* Celestial Teyvat Astrolabe Motion & Filigree Craft */
+@keyframes astrolabe-cw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes astrolabe-ccw {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes wish-ripple {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.48);
+    opacity: 0;
+  }
+}
+
+@keyframes constellation-bloom {
+  0% {
+    stroke-width: 3.5;
+    opacity: 0.85;
+  }
+  100% {
+    stroke-width: 0.5;
+    opacity: 0;
+  }
+}
+
+.astrolabe-outer {
+  animation: astrolabe-cw 120s linear infinite;
+}
+
+.astrolabe-inner {
+  animation: astrolabe-ccw 160s linear infinite;
+}
+
+.wish-ripple-halo {
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid var(--gold-bright);
+  box-shadow: 0 0 22px rgba(246, 224, 174, 0.65);
+  pointer-events: none;
+  animation: wish-ripple 0.68s var(--spring) forwards;
+}
+
+.wish-constellation-ring {
+  pointer-events: none;
+  animation: constellation-bloom 0.72s var(--spring) forwards;
+}
+
+.chord-spark {
+  pointer-events: none;
+}
+
+/* Filigree Hairline Divider (──── ✦ ────) */
+.filigree-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  opacity: 0.82;
+}
+
+.filigree-divider > span {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--hairline-strong) 35%,
+    var(--gold-dim) 100%
+  );
+}
+
+.filigree-divider > span:last-child {
+  background: linear-gradient(
+    90deg,
+    var(--gold-dim) 0%,
+    var(--hairline-strong) 65%,
+    transparent
+  );
+}
+
+/* Wish-Inspired Fate's Pick Button */
+.btn-wish {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 201, 125, 0.45);
+  background: linear-gradient(
+    135deg,
+    rgba(239, 201, 125, 0.16) 0%,
+    rgba(140, 226, 247, 0.08) 100%
+  );
+  color: var(--gold-bright);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 18px rgba(229, 198, 135, 0.1);
+  transition:
+    transform 0.24s var(--spring),
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
+}
+
+.btn-wish:hover {
+  transform: translateY(-1.5px);
+  border-color: var(--gold-bright);
+  background: linear-gradient(
+    135deg,
+    rgba(239, 201, 125, 0.26) 0%,
+    rgba(140, 226, 247, 0.14) 100%
+  );
+  box-shadow: 0 6px 24px rgba(239, 201, 125, 0.24);
+}
+
+.btn-wish:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Nation & Boss Geometric Crest Badge */
+.nation-crest-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(246, 240, 228, 0.035);
+  border: 1px solid rgba(236, 223, 195, 0.12);
+  transition: transform 0.25s var(--spring), border-color 0.2s ease;
+}
+
+.region-row:hover .nation-crest-badge,
+.boss-row:hover .nation-crest-badge {
+  transform: scale(1.06);
+  border-color: currentColor;
+}
+
+/* Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .astrolabe-outer,
+  .astrolabe-inner,
+  .wish-ripple-halo,
+  .wish-constellation-ring {
+    animation: none;
+  }
 }
 
 /* Responsive */

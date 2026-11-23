@@ -8,6 +8,7 @@ import type {
 } from '../types/genshin';
 import { generateRecommendedTeams } from '../engine/teamBuilder';
 import { CharacterPortrait } from './CharacterPortrait';
+import { NationEmblem } from './NationEmblem';
 
 interface BossesViewProps {
   roster: Character[];
@@ -154,18 +155,25 @@ export function BossesView({
         </div>
       </div>
 
-      {/* Quiet Category / Region Jump Strip */}
+      {/* Quiet Category / Region Jump Strip with Emblems */}
       <div className="roster-filter-bar" style={{ paddingBottom: 14 }}>
-        {BOSS_FILTERS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={`text-tab ${filterKey === key ? 'active' : ''}`}
-            onClick={() => setFilterKey(key)}
-          >
-            {key === 'All' ? `All Bosses (${ENCOUNTERS.length})` : key}
-          </button>
-        ))}
+        {BOSS_FILTERS.map((key) => {
+          const emblemColor =
+            REGION_ACCENT[key] ?? (key === 'Stygian 7.2' ? 'var(--gold-bright)' : 'var(--text-2)');
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`text-tab ${filterKey === key ? 'active' : ''}`}
+              onClick={() => setFilterKey(key)}
+            >
+              {key !== 'All' && key !== 'Weekly' && key !== 'Classic' && (
+                <NationEmblem nation={key} size={13} color={emblemColor} />
+              )}
+              {key === 'All' ? `All Bosses (${ENCOUNTERS.length})` : key}
+            </button>
+          );
+        })}
       </div>
 
       <div className="region-list">
@@ -184,12 +192,23 @@ export function BossesView({
                   style={{ backgroundColor: accent, height: 48 }}
                   aria-hidden="true"
                 />
+                <span
+                  className="nation-crest-badge"
+                  style={{ color: accent }}
+                  aria-hidden="true"
+                >
+                  <NationEmblem
+                    nation={boss.region}
+                    size={17}
+                    color={accent}
+                  />
+                </span>
                 <div style={{ minWidth: 0 }}>
                   <div className="region-focal-name">
                     <span>{boss.name}</span>
                     <span className="region-parent-tag">
                       {boss.region}
-                      {boss.isStygian72 ? ' · Stygian 7.2' : ` · ${boss.category}`}
+                      {boss.isStygian72 ? ' ✦ Stygian 7.2' : ` ✦ ${boss.category}`}
                     </span>
                   </div>
 

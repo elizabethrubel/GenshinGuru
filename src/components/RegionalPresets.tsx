@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowUpRight, Search, Swords } from 'lucide-react';
 import type { Character, RegionalPreset } from '../types/genshin';
 import { CharacterPortrait } from './CharacterPortrait';
+import { NationEmblem } from './NationEmblem';
 
 interface RegionalPresetsProps {
   presets: RegionalPreset[];
@@ -109,12 +110,12 @@ export function RegionalPresets({
     <div>
       <div className="list-toolbar">
         <div>
-          <h2 className="editorial-title" style={{ fontSize: 24 }}>
+          <h2 className="editorial-title" style={{ fontSize: 25 }}>
             Party by Region
           </h2>
           <p className="editorial-prose" style={{ marginTop: 4 }}>
-            Pick where you&apos;re exploring in Teyvat to see your go-to squad
-            and open it in the Team Circle.
+            Pick where you&apos;re exploring in Teyvat to summon your go-to
+            constellation directly into the Team Circle.
           </p>
         </div>
 
@@ -130,7 +131,7 @@ export function RegionalPresets({
         </div>
       </div>
 
-      {/* Quiet Nation Jump Strip */}
+      {/* Quiet Nation Jump Strip with Bespoke Emblems */}
       <div className="roster-filter-bar" style={{ paddingBottom: 14 }}>
         <button
           type="button"
@@ -146,9 +147,10 @@ export function RegionalPresets({
             className={`text-tab ${selectedNation === nation ? 'active' : ''}`}
             onClick={() => setSelectedNation(nation)}
           >
-            <span
-              className="nation-dot"
-              style={{ backgroundColor: NATION_COLORS[nation] }}
+            <NationEmblem
+              nation={nation}
+              size={14}
+              color={NATION_COLORS[nation]}
             />
             {nation}
           </button>
@@ -173,6 +175,17 @@ export function RegionalPresets({
                   style={{ backgroundColor: accentColor }}
                   aria-hidden="true"
                 />
+                <span
+                  className="nation-crest-badge"
+                  style={{ color: accentColor }}
+                  aria-hidden="true"
+                >
+                  <NationEmblem
+                    nation={parentNation ?? primaryName}
+                    size={18}
+                    color={accentColor}
+                  />
+                </span>
                 <div>
                   <div className="region-focal-name">
                     {primaryName}

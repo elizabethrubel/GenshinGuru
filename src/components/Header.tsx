@@ -1,5 +1,6 @@
-import { Bookmark, RefreshCw, Settings, Sparkles } from 'lucide-react';
+import { Bookmark, RefreshCw, Settings } from 'lucide-react';
 import type { ActiveTab, AppSettings } from '../types/genshin';
+import { PrimogemStar } from './NationEmblem';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -33,7 +34,7 @@ export function Header({
           onClick={() => onSelectTab('visualizer')}
         >
           <span className="brand-dot" aria-hidden="true">
-            <Sparkles size={13} />
+            <PrimogemStar size={14} />
           </span>
           <h1 className="brand-name">Genshin Guru</h1>
         </button>

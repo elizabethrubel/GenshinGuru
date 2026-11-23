@@ -9,12 +9,14 @@ import type {
   AppSettings,
   BuilderFilters,
   Character,
+  ElementType,
   EncounterDefinition,
   RegionalPreset,
   SavedAbyssPair,
   SavedTeam,
   TeamRecommendation,
 } from './types/genshin';
+import { ARCHETYPES } from './data/archetypes';
 import {
   analyzeTeam,
   BATTLE_READY_LEVEL,
@@ -83,6 +85,7 @@ export default function App() {
       EMPTY_SLOTS
     );
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
+  const [fatesBurstKey, setFatesBurstKey] = useState(0);
 
   const [isAskingGemini, setIsAskingGemini] = useState(false);
   const [geminiError, setGeminiError] = useState<string | null>(null);
@@ -452,8 +455,109 @@ export default function App() {
     notify(`Built Team Circle around ${char.name}.`);
   };
 
+  // Playful Wish-inspired "Fate's Pick" that summons a fresh, strong, distinct constellation
+  const handleFatesPick = () => {
+    const baseFilters: BuilderFilters = {
+      archetypeId: null,
+      encounterId: null,
+      anchorCharacterId: null,
+      includeUnbuilt: filters.includeUnbuilt,
+      requireSurvivability: filters.requireSurvivability,
+      excludedCharacterIds: filters.excludedCharacterIds,
+    };
+
+    const poolMap = new Map<string, TeamRecommendation>();
+    // General top picks + 1 top pick from each major archetype for rich variety
+    const general = generateRecommendedTeams(roster, baseFilters, 4);
+    for (const rec of general) {
+      const sig = rec.members
+        .map((m) => m.id)
+        .slice()
+        .sort()
+        .join('|');
+      if (!poolMap.has(sig)) poolMap.set(sig, rec);
+    }
+
+    for (const arch of ARCHETYPES) {
+      const top = generateRecommendedTeams(
+        roster,
+        { ...baseFilters, archetypeId: arch.id },
+        1
+      )[0];
+      if (top) {
+        const sig = top.members
+          .map((m) => m.id)
+          .slice()
+          .sort()
+          .join('|');
+        if (!poolMap.has(sig)) poolMap.set(sig, top);
+      }
+    }
+
+    const candidates = Array.from(poolMap.values());
+    if (candidates.length === 0) {
+      notify('Enable Lv 1–90 in the rules menu to widen Fate’s Pick.');
+      return;
+    }
+
+    const currentSig = activeTeam
+      ? activeTeam.members
+          .map((m) => m.id)
+          .slice()
+          .sort()
+          .join('|')
+      : '';
+    const freshPool =
+      candidates.length > 1
+        ? candidates.filter(
+            (c) =>
+              c.members
+                .map((m) => m.id)
+                .slice()
+                .sort()
+                .join('|') !== currentSig
+          )
+        : candidates;
+
+    const chosen = freshPool[Math.floor(Math.random() * freshPool.length)];
+    setSelectedRegionId(null);
+    setFilters(baseFilters);
+    setSelectedRecId(null);
+    setManualSlots(chosen.members);
+    setManualTeam({
+      ...chosen,
+      id: `fates-${Date.now()}`,
+      subtitle: `Fate's Pick · ${chosen.subtitle}`,
+    });
+    setFatesBurstKey((k) => k + 1);
+    notify(`✦ Fate's Pick summoned ${chosen.title}`);
+  };
+
+  // Dynamic ambient elemental sky mood matching the active party's dominant Vision
+  const ambientElement: ElementType | 'Default' = useMemo(() => {
+    if (activeTab !== 'visualizer') return 'Default';
+    const slots = activeTeam ? activeTeam.members : manualSlots;
+    const present = slots.filter((c): c is Character => Boolean(c));
+    if (present.length === 0) return 'Default';
+
+    const counts = new Map<ElementType, number>();
+    present.forEach((m, idx) => {
+      counts.set(m.element, (counts.get(m.element) ?? 0) + (idx === 0 ? 1.2 : 1));
+    });
+
+    let best: ElementType = present[0].element;
+    let max = -1;
+    counts.forEach((val, el) => {
+      if (val > max) {
+        max = val;
+        best = el;
+      }
+    });
+    return best;
+  }, [activeTab, activeTeam, manualSlots]);
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-ambient={ambientElement}>
       <Header
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -488,6 +592,7 @@ export default function App() {
               manualSlots={manualSlots}
               hasActiveSelection={hasActiveFilterCriteria}
               activeRegionName={activeRegionPreset?.region ?? null}
+              burstSignal={fatesBurstKey}
               onSelectRecommendation={(rec) => {
                 setSelectedRegionId(null);
                 setManualTeam(null);
@@ -495,6 +600,7 @@ export default function App() {
                 setSelectedRecId(rec.id);
               }}
               onSwapSlot={handleSwapSlot}
+              onFatesPick={handleFatesPick}
               roster={roster}
               includeUnbuilt={filters.includeUnbuilt}
               onSaveTeam={handleSaveTeam}

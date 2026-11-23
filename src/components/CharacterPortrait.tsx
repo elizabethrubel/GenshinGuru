@@ -36,9 +36,11 @@ export function CharacterPortrait({
     }
   }, [src]);
 
+  const rarityClass = character.rarity === 5 ? 'rarity-5' : 'rarity-4';
+
   return (
     <div
-      className="portrait-img-wrap"
+      className={`portrait-img-wrap ${rarityClass} el-${character.element}`}
       style={{ width: size, height: size }}
     >
       {/* Always render the character's Elemental Sign underneath as an instant fallback while loading or on error */}

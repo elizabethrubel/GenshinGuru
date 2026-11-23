@@ -10,6 +10,7 @@ import type { Character, SlotRole, TeamRecommendation } from '../types/genshin';
 import { analyzeTeam, inferSlotRoles } from '../engine/teamAnalyzer';
 import { getContextualBuildCallouts } from '../engine/buildPriorities';
 import { CharacterPortrait } from './CharacterPortrait';
+import { PrimogemStar } from './NationEmblem';
 import { SlotSwapDrawer } from './SlotSwapDrawer';
 import { getEdgeColor, TeamCircle } from './TeamCircle';
 
@@ -24,8 +25,10 @@ interface TeamVisualizerProps {
   ];
   hasActiveSelection: boolean;
   activeRegionName?: string | null;
+  burstSignal?: number;
   onSelectRecommendation: (rec: TeamRecommendation) => void;
   onSwapSlot: (slotIndex: number, nextChar: Character) => void;
+  onFatesPick: () => void;
   roster: Character[];
   includeUnbuilt: boolean;
   onSaveTeam: (team: TeamRecommendation) => void;
@@ -40,8 +43,10 @@ export function TeamVisualizer({
   manualSlots,
   hasActiveSelection,
   activeRegionName,
+  burstSignal = 0,
   onSelectRecommendation,
   onSwapSlot,
+  onFatesPick,
   roster,
   includeUnbuilt,
   onSaveTeam,
@@ -130,6 +135,7 @@ export function TeamVisualizer({
             activeEdgeIndex={activeEdgeIdx}
             onHoverEdge={setActiveEdgeIdx}
             onClickSlot={(idx) => setSwappingSlot(idx)}
+            burstSignal={burstSignal}
           />
 
           {/* Compact Portrait-Cluster Switcher when engine recommendations are active */}
@@ -179,21 +185,34 @@ export function TeamVisualizer({
             <>
               <div>
                 <div className="section-kicker" style={{ color: 'var(--gold)' }}>
-                  Ready When You Are
+                  ✦ Constellation Astrolabe
                 </div>
-                <h2 className="editorial-title">Visualize Your Next Team</h2>
+                <h2 className="editorial-title">Assemble Your Party</h2>
                 <p className="editorial-prose" style={{ marginTop: 10 }}>
                   Choose a <strong>Region</strong>, <strong>Reaction Style</strong>,{' '}
-                  <strong>Encounter</strong>, or <strong>Anchor Character</strong>{' '}
-                  from the bar above — or click any of the four slots on the
-                  circle to assemble a squad manually and watch their elemental
-                  connections light up.
+                  <strong>Boss</strong>, or <strong>Anchor Character</strong>{' '}
+                  above — or tap any of the four Vision slots on the astrolabe to
+                  watch their elemental chords come alive.
                 </p>
               </div>
 
-              <hr className="hairline" />
+              <div className="filigree-divider" aria-hidden="true">
+                <span />
+                <PrimogemStar size={10} color="var(--gold)" />
+                <span />
+              </div>
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  id="btn-fates-pick-empty"
+                  type="button"
+                  className="btn-wish"
+                  onClick={onFatesPick}
+                  title="Summon a fresh high-synergy party from your roster"
+                >
+                  <PrimogemStar size={13} />
+                  Fate&apos;s Pick
+                </button>
                 <button
                   type="button"
                   className="btn-subtle"
@@ -228,7 +247,7 @@ export function TeamVisualizer({
               <p className="editorial-prose" style={{ marginTop: 8 }}>
                 Open the <strong>Lv 70+</strong> menu in the top bar and enable{' '}
                 <strong>Include Unbuilt (Lv 1–69)</strong> to unlock specialist
-                characters like Alyosha, Chevreuse, or Kachina.
+                characters like Alyosha, Mitya, Chevreuse, or Kachina.
               </p>
             </div>
           ) : (
@@ -239,7 +258,7 @@ export function TeamVisualizer({
                     className="section-kicker"
                     style={{ color: 'var(--gold)', marginBottom: 4 }}
                   >
-                    {activeRegionName}
+                    ✦ {activeRegionName}
                   </div>
                 )}
                 <h2 className="editorial-title">
@@ -252,7 +271,7 @@ export function TeamVisualizer({
                   </span>
                   {liveAnalysis.moonsignTotal > 0 && (
                     <>
-                      <span className="meta-sep">·</span>
+                      <span className="meta-sep">✦</span>
                       <span
                         style={{
                           color:
@@ -268,20 +287,24 @@ export function TeamVisualizer({
                   )}
                   {liveAnalysis.stellarState.includes('Active') && (
                     <>
-                      <span className="meta-sep">·</span>
+                      <span className="meta-sep">✦</span>
                       <span style={{ color: 'var(--stellar)' }}>
                         {liveAnalysis.stellarState.replace(' Active', '')}
                       </span>
                     </>
                   )}
-                  <span className="meta-sep">·</span>
+                  <span className="meta-sep">✦</span>
                   <span>
                     {sustainNames ? `Sustain: ${sustainNames}` : 'Glass Cannon'}
                   </span>
                 </div>
               </div>
 
-              <hr className="hairline" />
+              <div className="filigree-divider" aria-hidden="true">
+                <span />
+                <PrimogemStar size={10} color="var(--gold)" />
+                <span />
+              </div>
 
               {/* Interactive Reaction Connections */}
               <div>
@@ -321,7 +344,7 @@ export function TeamVisualizer({
                   {visibleEdges.length === 0 && (
                     <p className="editorial-prose">
                       {filledMembers.length < 2
-                        ? 'Add another character on the circle to see elemental reaction chords.'
+                        ? 'Add another Vision on the circle to awaken elemental reaction chords.'
                         : 'Mono-element or raw damage pairing without direct reaction chords.'}
                     </p>
                   )}
@@ -330,7 +353,11 @@ export function TeamVisualizer({
 
               {effectiveTeam && (
                 <>
-                  <hr className="hairline" />
+                  <div className="filigree-divider" aria-hidden="true">
+                    <span />
+                    <PrimogemStar size={10} color="var(--gold)" />
+                    <span />
+                  </div>
 
                   <div>
                     <h3 className="section-kicker">Why It Works</h3>
@@ -351,7 +378,7 @@ export function TeamVisualizer({
                         </strong>{' '}
                         {liveAnalysis.resonances
                           .map((r) => `${r.name} (${r.effect})`)
-                          .join(' · ')}
+                          .join(' ✦ ')}
                       </p>
                     )}
                   </div>
@@ -362,7 +389,11 @@ export function TeamVisualizer({
               {(buildCallouts.length > 0 ||
                 liveAnalysis.warnings.length > 0) && (
                 <>
-                  <hr className="hairline" />
+                  <div className="filigree-divider" aria-hidden="true">
+                    <span />
+                    <PrimogemStar size={10} color="var(--gold)" />
+                    <span />
+                  </div>
                   <div>
                     {buildCallouts.length > 0 && (
                       <h3
@@ -446,6 +477,16 @@ export function TeamVisualizer({
                   >
                     <Bookmark size={13} />
                     Save Team
+                  </button>
+                  <button
+                    id="btn-fates-pick"
+                    type="button"
+                    className="btn-wish"
+                    onClick={onFatesPick}
+                    title="Draw another high-synergy constellation from your roster"
+                  >
+                    <PrimogemStar size={12} />
+                    Fate&apos;s Pick
                   </button>
                   <button
                     id="btn-copy-sheet-row"
