@@ -6,12 +6,12 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     name: 'Stellar-Conduct',
     category: 'Stellar',
     summary:
-      'Cryo + Electro Stellar Glimmer reaction powered by Cryo Traveller (and Alyosha as dedicated support/healer).',
+      'Cryo + Electro Stellar Glimmer reaction powered by Mitya, Cryo Traveller, and Alyosha (dedicated support/healer).',
     keyElements: ['Cryo', 'Electro'],
     requiredTags: ['stellar-conduct'],
     prefersStellar: true,
     highlightNote:
-      'Trigger Cryo + Electro with Cryo Traveller on-field to enter Radiance: Stellar-Conduct. Fischl provides steady Electro battery; leveling Alyosha unlocks a dedicated Stellar-Conduct healer.',
+      'Pair Mitya and Cryo Traveller with Alyosha (dedicated Stellar-Conduct healer & +20% DMG buffer) and Fischl or Kaeya to maintain Radiance: Stellar-Conduct.',
   },
   {
     id: 'stellar-swirl',

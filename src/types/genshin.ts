@@ -75,16 +75,29 @@ export interface EncounterDefinition {
   id: string;
   name: string;
   region: string;
-  category: 'World Boss' | 'Weekly Boss' | 'Stygian Onslaught' | 'Shield & Mechanic' | 'Abyss / Domain';
+  category:
+    | 'World Boss'
+    | 'Weekly Boss'
+    | 'Stygian Onslaught'
+    | 'Hypostasis & Regisvine'
+    | 'Elite & Shields'
+    | 'Shield & Mechanic'
+    | 'Abyss / Domain';
   summary: string;
   tacticalTip: string;
   preferredArchetypes: string[];
   preferredElements: ElementType[];
   avoidElements?: ElementType[];
+  requiresElements?: ElementType[];
   requiredTags?: MechanicTag[];
   requiresHealer?: boolean;
+  requiresShielder?: boolean;
+  avoidShielder?: boolean;
+  requiresBow?: boolean;
+  requiresClaymoreOrGeo?: boolean;
   dropsFor?: string[];
   isStygian72?: boolean;
+  isCustom?: boolean;
   keywords: string[];
   matchedPresetRegion?: string;
 }
@@ -156,6 +169,7 @@ export interface TeamRecommendation {
 export interface BuilderFilters {
   archetypeId: string | null;
   encounterId: string | null;
+  customEncounter?: EncounterDefinition | null;
   anchorCharacterId: string | null;
   includeUnbuilt: boolean;
   requireSurvivability: boolean;

@@ -311,7 +311,7 @@ export function TeamVisualizer({
               <p className="editorial-prose" style={{ marginTop: 8 }}>
                 Toggle <strong>Pool: Lv 70+</strong> in the top bar to{' '}
                 <strong>Lv 1–90</strong> to unlock specialist characters like
-                Alyosha, Mitya, Chevreuse, or Kachina.
+                Chevreuse, Baizhu, Kachina, or Lynette.
               </p>
             </div>
           ) : (

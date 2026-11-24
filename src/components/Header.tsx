@@ -60,7 +60,7 @@ export function Header({
             className={`nav-link ${activeTab === 'bosses' ? 'active' : ''}`}
             onClick={() => onSelectTab('bosses')}
           >
-            Bosses
+            Opponents
           </button>
 
           <button

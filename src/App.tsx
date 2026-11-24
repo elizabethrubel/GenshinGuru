@@ -131,6 +131,7 @@ export default function App() {
   const [filters, setFilters] = useState<BuilderFilters>({
     archetypeId: null,
     encounterId: null,
+    customEncounter: null,
     anchorCharacterId: null,
     includeUnbuilt: false,
     requireSurvivability: true,
@@ -157,6 +158,7 @@ export default function App() {
   >(['traveller', 'xiangling', 'bennett', 'yumemizuki-mizuki']);
   const [half1Label, setHalf1Label] = useState('Lunar-Charged Ascendant');
   const [half2Label, setHalf2Label] = useState('Cryo Melt & Swirl');
+  const [abyssExternalRevision, setAbyssExternalRevision] = useState(0);
 
   const [savedTeams, setSavedTeams] = useState<SavedTeam[]>(() =>
     loadSavedTeams()
@@ -276,6 +278,7 @@ export default function App() {
     Boolean(selectedRegionId) ||
     Boolean(filters.archetypeId) ||
     Boolean(filters.encounterId) ||
+    Boolean(filters.customEncounter) ||
     Boolean(filters.anchorCharacterId) ||
     Boolean(manualTeam);
 
@@ -332,6 +335,7 @@ export default function App() {
     if (
       !filters.archetypeId &&
       !filters.encounterId &&
+      !filters.customEncounter &&
       !filters.anchorCharacterId
     ) {
       return [];
@@ -367,6 +371,7 @@ export default function App() {
       ...prev,
       archetypeId: null,
       encounterId: null,
+      customEncounter: null,
       anchorCharacterId: null,
     }));
     setManualTeam(null);
@@ -570,6 +575,8 @@ export default function App() {
       );
     }
 
+    setAbyssExternalRevision((r) => r + 1);
+
     notify(`Queued "${label}" in Abyss Half ${half}`, {
       label: 'Open Abyss →',
       onAction: () => {
@@ -599,6 +606,7 @@ export default function App() {
       ...filters,
       archetypeId: null,
       encounterId: null,
+      customEncounter: null,
       anchorCharacterId: char.id,
       includeUnbuilt:
         char.level < BATTLE_READY_LEVEL ? true : filters.includeUnbuilt,
@@ -610,7 +618,7 @@ export default function App() {
           sourceTab === 'roster'
             ? 'Roster'
             : sourceTab === 'bosses'
-              ? 'Bosses'
+              ? 'Opponents'
               : sourceTab === 'regions'
                 ? 'Regions'
                 : 'Spiral Abyss',
@@ -632,7 +640,8 @@ export default function App() {
     setFilters((prev) => ({
       ...prev,
       archetypeId: null,
-      encounterId: boss.id,
+      encounterId: boss.isCustom ? null : boss.id,
+      customEncounter: boss.isCustom ? boss : null,
       anchorCharacterId: null,
     }));
     if (precomputedRec) {
@@ -648,7 +657,7 @@ export default function App() {
         fromTab: sourceTab,
         label:
           sourceTab === 'bosses'
-            ? 'Bosses'
+            ? 'Opponents'
             : sourceTab === 'roster'
               ? 'Roster'
               : sourceTab === 'regions'
@@ -873,6 +882,7 @@ export default function App() {
                 ...prev,
                 archetypeId: null,
                 encounterId: null,
+                customEncounter: null,
                 anchorCharacterId: null,
               }));
               setSelectedRecId(null);
@@ -914,6 +924,7 @@ export default function App() {
             half2Ids={half2Ids}
             half1Label={half1Label}
             half2Label={half2Label}
+            externalRevision={abyssExternalRevision}
             includeUnbuilt={filters.includeUnbuilt}
             requireSurvivability={filters.requireSurvivability}
             onChangeHalf={(half, ids, label) => {
@@ -932,21 +943,22 @@ export default function App() {
               setHalf2Label(half1Label);
               notify('Swapped Half 1 and Half 2.');
             }}
-            onSaveAbyssPair={(name) => {
+            onSaveAbyssPair={(payload) => {
               const pair: SavedAbyssPair = {
                 id: `abyss-${Date.now()}`,
-                name,
-                half1Ids,
-                half2Ids,
-                half1Label,
-                half2Label,
+                name: payload.name,
+                half1Ids: payload.half1Ids,
+                half2Ids: payload.half2Ids,
+                half1Label: payload.half1Label,
+                half2Label: payload.half2Label,
                 createdAt: new Date().toISOString(),
               };
               const next = [pair, ...savedAbyssPairs];
               setSavedAbyssPairs(next);
               saveSavedAbyssPairs(next);
-              notify(`Saved "${name}".`);
+              notify(`Saved "${payload.name}".`);
             }}
+            onInspectCharacter={(char) => setInspectedCharacter(char)}
           />
         )}
 
@@ -1039,6 +1051,7 @@ export default function App() {
             setHalf2Ids(pair.half2Ids);
             setHalf1Label(pair.half1Label);
             setHalf2Label(pair.half2Label);
+            setAbyssExternalRevision((r) => r + 1);
             setActiveTab('abyss', true);
             notify(`Loaded "${pair.name}" into Spiral Abyss.`);
           }}

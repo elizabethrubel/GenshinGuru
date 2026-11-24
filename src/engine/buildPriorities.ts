@@ -251,7 +251,7 @@ export function getContextualBuildCallouts(
     );
     addIfUnbuilt(
       'alyosha',
-      'Already Lv 57! Dedicated Stellar-Conduct healer & +20% DMG buffer for Cryo Traveller and Mitya.'
+      'Dedicated Stellar-Conduct healer & +20% DMG buffer for Cryo Traveller and Mitya.'
     );
     addIfUnbuilt(
       'rosaria',
