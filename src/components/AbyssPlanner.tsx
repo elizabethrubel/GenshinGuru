@@ -64,7 +64,7 @@ interface AbyssPlannerProps {
   onInspectCharacter: (char: Character) => void;
 }
 
-const FLOOR_DISPLAY_ORDER: AbyssFloorNumber[] = [12, 11, 10, 9];
+const FLOOR_DISPLAY_ORDER: AbyssFloorNumber[] = [9, 10, 11, 12];
 
 function toTuple(ids: string[]): AbyssSlotIds {
   return [ids[0] ?? null, ids[1] ?? null, ids[2] ?? null, ids[3] ?? null];
