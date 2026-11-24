@@ -79,10 +79,28 @@ function scoreCandidateForFilters(
   }
 
   if (encounter) {
-    if (encounter.avoidElements?.includes(char.element)) score -= 90;
+    if (encounter.avoidElements?.includes(char.element)) score -= 95;
     if (encounter.preferredElements.includes(char.element)) score += 24;
+    if (encounter.requiresElements?.includes(char.element)) score += 38;
     if (encounter.requiredTags?.some((t) => char.mechanicTags.includes(t))) {
       score += 55;
+    }
+    if (encounter.requiresBow && char.weapon === 'Bow') {
+      score += 36;
+    }
+    if (encounter.requiresClaymoreOrGeo) {
+      const geoAvoided = encounter.avoidElements?.includes('Geo');
+      if (char.weapon === 'Claymore' && (!geoAvoided || char.element !== 'Geo')) {
+        score += 36;
+      } else if (!geoAvoided && char.element === 'Geo') {
+        score += 28;
+      }
+    }
+    if (encounter.requiresShielder && char.isShielder) {
+      score += 38;
+    }
+    if (encounter.avoidShielder && char.isShielder) {
+      score -= 85;
     }
   }
 
@@ -173,12 +191,14 @@ function deriveTeamTitle(
 export function generateRecommendedTeams(
   roster: Character[],
   filters: BuilderFilters,
-  maxResults = 6
+  maxResults = 6,
+  poolLimit = 18
 ): TeamRecommendation[] {
   const archetype =
     ARCHETYPES.find((a) => a.id === filters.archetypeId) ?? null;
   const encounter =
-    ENCOUNTERS.find((e) => e.id === filters.encounterId) ?? null;
+    filters.customEncounter ??
+    (ENCOUNTERS.find((e) => e.id === filters.encounterId) ?? null);
   const excluded = new Set(filters.excludedCharacterIds);
 
   const eligible = roster.filter((c) => {
@@ -190,7 +210,7 @@ export function generateRecommendedTeams(
 
   if (eligible.length < 4) return [];
 
-  // Evaluate top 18 candidates (up to 3,060 4-combos — runs in ~8ms)
+  // Evaluate top N candidates (default 18 -> 3,060 combos; 15 -> 1,365 combos for fast multi-floor solving)
   const rankedPool = [...eligible]
     .sort(
       (a, b) =>
@@ -207,7 +227,7 @@ export function generateRecommendedTeams(
           filters.anchorCharacterId
         )
     )
-    .slice(0, 18);
+    .slice(0, poolLimit);
 
   if (filters.anchorCharacterId) {
     const anchor = eligible.find((c) => c.id === filters.anchorCharacterId);
@@ -418,6 +438,67 @@ export function generateRecommendedTeams(
             // Require an actual Healer when boss mechanics demand healing (e.g. Moongecko cocoon, The Knave Bond of Life)
             if (encounter.requiresHealer && !analysis.hasHealer) {
               rankScore -= 80;
+            }
+
+            // Require at least one counter element when shields/revival phases demand it (e.g. Hydro vs Pyro Hypostasis, Pyro vs Cryo Regisvine, Dendro vs Dendro Hypostasis)
+            if (encounter.requiresElements && encounter.requiresElements.length > 0) {
+              const hasRequiredEl = combo.some((c) =>
+                encounter.requiresElements!.includes(c.element)
+              );
+              if (hasRequiredEl) {
+                rankScore += 52;
+              } else {
+                rankScore -= 110;
+              }
+            }
+
+            // Bow weakpoint / airborne mechanics (Aeonblight Drake, Oceanid Raptors, Eye of the Storm, Ruin Hunters)
+            if (encounter.requiresBow) {
+              const hasBow = combo.some((c) => c.weapon === 'Bow');
+              if (hasBow) {
+                rankScore += 42;
+              } else {
+                rankScore -= 55;
+              }
+            }
+
+            // Heavy armor / Basalt Pillar counters (Geo Hypostasis, Legatus Golem, Geo Shield Mitachurls)
+            if (encounter.requiresClaymoreOrGeo) {
+              const geoAvoided = encounter.avoidElements?.includes('Geo');
+              const hasClaymore = combo.some(
+                (c) =>
+                  c.weapon === 'Claymore' &&
+                  (!geoAvoided || c.element !== 'Geo')
+              );
+              const hasGeoBreaker =
+                !geoAvoided && combo.some((c) => c.element === 'Geo');
+              const hasOverloaded = analysis.reactions.some(
+                (r) => r.name === 'Overloaded'
+              );
+              if (hasClaymore || hasGeoBreaker || hasOverloaded) {
+                rankScore += 40;
+              } else {
+                rankScore -= 45;
+              }
+            }
+
+            // Shield reflection / survivability counters (Primo Geovishap, Azhdaha)
+            if (encounter.requiresShielder) {
+              if (analysis.hasShielder) {
+                rankScore += 46;
+              } else {
+                rankScore -= 50;
+              }
+            }
+
+            // Anti-shield opponents (Shadowy Husks / Black Serpent Knights)
+            if (encounter.avoidShielder) {
+              const shielderCount = combo.filter((c) => c.isShielder).length;
+              if (shielderCount > 0) {
+                rankScore -= shielderCount * 115;
+              } else {
+                rankScore += 22;
+              }
             }
 
             // Reward matching the boss's single best counter archetype (never double-dip!)

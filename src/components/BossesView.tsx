@@ -1,6 +1,10 @@
-import { useMemo } from 'react';
-import { ArrowUpRight, Search, Swords } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowUpRight, Search, Swords, Wand2 } from 'lucide-react';
 import { ENCOUNTERS } from '../data/encounters';
+import {
+  buildCustomEncounterFromQuery,
+  searchEncounters,
+} from '../engine/encounterResolver';
 import type {
   Character,
   EncounterDefinition,
@@ -12,13 +16,19 @@ import { NationEmblem } from './NationEmblem';
 
 export type BossFilterKey =
   | 'All'
+  | 'Hypostases & Regisvines'
   | 'Stygian 7.2'
+  | 'World Bosses'
+  | 'Weekly'
+  | 'Elites & Shields'
   | 'Snezhnaya'
   | 'Nod-Krai'
   | 'Fontaine'
   | 'Natlan'
-  | 'Weekly'
-  | 'Classic';
+  | 'Sumeru'
+  | 'Inazuma'
+  | 'Liyue'
+  | 'Mondstadt';
 
 interface BossesViewProps {
   roster: Character[];
@@ -41,14 +51,31 @@ interface BossesViewProps {
 
 const BOSS_FILTERS: BossFilterKey[] = [
   'All',
+  'Hypostases & Regisvines',
   'Stygian 7.2',
+  'World Bosses',
+  'Weekly',
+  'Elites & Shields',
   'Snezhnaya',
   'Nod-Krai',
   'Fontaine',
   'Natlan',
-  'Weekly',
-  'Classic',
+  'Sumeru',
+  'Inazuma',
+  'Liyue',
+  'Mondstadt',
 ];
+
+const NATION_FILTER_KEYS = new Set<string>([
+  'Snezhnaya',
+  'Nod-Krai',
+  'Fontaine',
+  'Natlan',
+  'Sumeru',
+  'Inazuma',
+  'Liyue',
+  'Mondstadt',
+]);
 
 const REGION_ACCENT: Record<string, string> = {
   Snezhnaya: 'var(--el-cryo)',
@@ -59,7 +86,10 @@ const REGION_ACCENT: Record<string, string> = {
   Inazuma: 'var(--el-electro)',
   Liyue: 'var(--el-geo)',
   Mondstadt: 'var(--el-anemo)',
+  'Custom Opponent': 'var(--gold-bright)',
 };
+
+const INITIAL_VISIBLE_COUNT = 24;
 
 export function BossesView({
   roster,
@@ -72,88 +102,148 @@ export function BossesView({
   onInspectCharacter,
   onSendToAbyss,
 }: BossesViewProps) {
-  const filteredBosses = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return ENCOUNTERS.filter((boss) => {
-      if (filterKey === 'Stygian 7.2' && !boss.isStygian72) return false;
-      if (filterKey === 'Weekly' && boss.category !== 'Weekly Boss') return false;
-      if (
-        filterKey === 'Classic' &&
-        !['Sumeru', 'Inazuma', 'Liyue', 'Mondstadt'].includes(boss.region)
-      ) {
-        return false;
-      }
-      if (
-        ['Snezhnaya', 'Nod-Krai', 'Fontaine', 'Natlan'].includes(filterKey) &&
-        boss.region !== filterKey
-      ) {
-        return false;
-      }
+  const [showAllUnfiltered, setShowAllUnfiltered] = useState(false);
 
-      if (!q) return true;
-      return (
-        boss.name.toLowerCase().includes(q) ||
-        boss.region.toLowerCase().includes(q) ||
-        boss.summary.toLowerCase().includes(q) ||
-        boss.tacticalTip.toLowerCase().includes(q) ||
-        boss.keywords.some((k) => k.includes(q)) ||
-        (boss.dropsFor?.some((d) => d.toLowerCase().includes(q)) ?? false)
-      );
+  // Per-(roster, includeUnbuilt) memoized cache so typing in search never recomputes recommendations
+  const recCache = useMemo(
+    () => new Map<string, TeamRecommendation | null>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [roster, includeUnbuilt]
+  );
+
+  const getTopRec = (boss: EncounterDefinition): TeamRecommendation | null => {
+    const cached = recCache.get(boss.id);
+    if (cached !== undefined) return cached;
+
+    const topRec =
+      generateRecommendedTeams(
+        roster,
+        {
+          archetypeId: null,
+          encounterId: boss.isCustom ? null : boss.id,
+          customEncounter: boss.isCustom ? boss : null,
+          anchorCharacterId: null,
+          includeUnbuilt,
+          requireSurvivability: true,
+          excludedCharacterIds: [],
+        },
+        1
+      )[0] ?? null;
+
+    recCache.set(boss.id, topRec);
+    return topRec;
+  };
+
+  const filteredBosses = useMemo(() => {
+    const categoryFiltered = ENCOUNTERS.filter((boss) => {
+      if (filterKey === 'Stygian 7.2') return Boolean(boss.isStygian72);
+      if (filterKey === 'Hypostases & Regisvines') {
+        return boss.category === 'Hypostasis & Regisvine';
+      }
+      if (filterKey === 'World Bosses') {
+        return (
+          boss.category === 'World Boss' ||
+          boss.category === 'Stygian Onslaught'
+        );
+      }
+      if (filterKey === 'Weekly') return boss.category === 'Weekly Boss';
+      if (filterKey === 'Elites & Shields') {
+        return boss.category === 'Elite & Shields';
+      }
+      if (NATION_FILTER_KEYS.has(filterKey)) {
+        return boss.region === filterKey;
+      }
+      return true;
     });
+
+    const trimmed = search.trim();
+    if (!trimmed) return categoryFiltered;
+
+    // When searching, search within the active filter first; if 0 hits and a category filter is active, search all opponents so users always find what they typed!
+    const inCategory = searchEncounters(trimmed, categoryFiltered);
+    if (inCategory.length > 0 || filterKey === 'All') {
+      return inCategory;
+    }
+    return searchEncounters(trimmed, ENCOUNTERS);
   }, [search, filterKey]);
 
-  const bossMatchups = useMemo(() => {
-    return filteredBosses.map((boss) => {
-      const topRec =
-        generateRecommendedTeams(
-          roster,
-          {
-            archetypeId: null,
-            encounterId: boss.id,
-            anchorCharacterId: null,
-            includeUnbuilt,
-            requireSurvivability: true,
-            excludedCharacterIds: [],
-          },
-          1
-        )[0] ?? null;
+  const customFallbackBoss = useMemo<EncounterDefinition | null>(() => {
+    const trimmed = search.trim();
+    if (trimmed.length < 3) return null;
+    const exactHit = filteredBosses.some(
+      (b) => b.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exactHit) return null;
+    return buildCustomEncounterFromQuery(trimmed);
+  }, [search, filteredBosses]);
 
-      return { boss, topRec };
-    });
-  }, [filteredBosses, roster, includeUnbuilt]);
+  const isUnfilteredAll = filterKey === 'All' && !search.trim();
+  const visibleBosses =
+    isUnfilteredAll && !showAllUnfiltered
+      ? filteredBosses.slice(0, INITIAL_VISIBLE_COUNT)
+      : filteredBosses;
+
+  const bossMatchups = useMemo(() => {
+    const list: Array<{
+      boss: EncounterDefinition;
+      topRec: TeamRecommendation | null;
+    }> = visibleBosses.map((boss) => ({
+      boss,
+      topRec: getTopRec(boss),
+    }));
+
+    if (customFallbackBoss && filteredBosses.length === 0) {
+      list.unshift({
+        boss: customFallbackBoss,
+        topRec: getTopRec(customFallbackBoss),
+      });
+    } else if (customFallbackBoss && search.trim().length >= 3) {
+      list.push({
+        boss: customFallbackBoss,
+        topRec: getTopRec(customFallbackBoss),
+      });
+    }
+
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleBosses, customFallbackBoss, filteredBosses.length, search, recCache]);
+
+  const remainingCount = filteredBosses.length - visibleBosses.length;
 
   return (
     <div>
       <div className="list-toolbar">
         <div>
           <h2 className="editorial-title" style={{ fontSize: 25 }}>
-            Boss Matchups
+            Opponents &amp; Boss Matchups
           </h2>
           <p className="editorial-prose" style={{ marginTop: 4 }}>
-            Your strongest counter team for each World Boss, Stygian Onslaught
-            7.2 boss, and Weekly Trounce Domain — computed live from your{' '}
-            <strong>{includeUnbuilt ? 'Lv 1–90' : 'Lv 70+'}</strong> pool.
+            Search any Hypostasis, Regisvine, World Boss, Weekly Trounce Domain,
+            Elemental Shield, or custom enemy — counter teams are computed live
+            from your <strong>{includeUnbuilt ? 'Lv 1–90' : 'Lv 70+'}</strong>{' '}
+            pool.
           </p>
         </div>
 
-        <div className="command-search-wrap" style={{ maxWidth: 280 }}>
+        <div className="command-search-wrap" style={{ maxWidth: 320 }}>
           <Search size={14} className="command-search-icon" />
           <input
             type="text"
             className="command-input"
             value={search}
             onChange={(e) => onChangeSearch(e.target.value)}
-            placeholder="Search boss or drop (e.g. Wavebinder, Mitya)…"
+            placeholder="Search opponent (e.g. Anemo Hypostasis, Oceanid, Pyro Slime)…"
           />
         </div>
       </div>
 
-      {/* Quiet Category / Region Jump Strip with Emblems */}
+      {/* Category & Nation Jump Strip */}
       <div className="roster-filter-bar" style={{ paddingBottom: 14 }}>
         {BOSS_FILTERS.map((key) => {
           const emblemColor =
             REGION_ACCENT[key] ??
             (key === 'Stygian 7.2' ? 'var(--gold-bright)' : 'var(--text-2)');
+          const showEmblem = NATION_FILTER_KEYS.has(key) || key === 'Stygian 7.2';
           return (
             <button
               key={key}
@@ -161,10 +251,10 @@ export function BossesView({
               className={`text-tab ${filterKey === key ? 'active' : ''}`}
               onClick={() => onChangeFilterKey(key)}
             >
-              {key !== 'All' && key !== 'Weekly' && key !== 'Classic' && (
+              {showEmblem && (
                 <NationEmblem nation={key} size={13} color={emblemColor} />
               )}
-              {key === 'All' ? `All Bosses (${ENCOUNTERS.length})` : key}
+              {key === 'All' ? `All (${ENCOUNTERS.length})` : key}
             </button>
           );
         })}
@@ -181,7 +271,7 @@ export function BossesView({
 
           return (
             <div key={boss.id} className="boss-row">
-              {/* Left: Boss Focal Point + Clickable Character Drops + Mechanic Tip */}
+              {/* Left: Opponent Focal Point + Clickable Character Drops + Mechanic Tip */}
               <div className="region-focal">
                 <span
                   className="region-accent-bar"
@@ -193,16 +283,29 @@ export function BossesView({
                   style={{ color: accent }}
                   aria-hidden="true"
                 >
-                  <NationEmblem nation={boss.region} size={17} color={accent} />
+                  {boss.isCustom ? (
+                    <Wand2 size={16} color={accent} />
+                  ) : (
+                    <NationEmblem
+                      nation={boss.region}
+                      size={17}
+                      color={accent}
+                    />
+                  )}
                 </span>
                 <div style={{ minWidth: 0 }}>
                   <div className="region-focal-name">
-                    <span>{boss.name}</span>
+                    <span>
+                      {boss.isCustom ? `Custom Counter: ${boss.name}` : boss.name}
+                    </span>
                     <span className="region-parent-tag">
-                      {boss.region}
-                      {boss.isStygian72
-                        ? ' ✦ Stygian 7.2'
-                        : ` ✦ ${boss.category}`}
+                      {boss.isCustom
+                        ? 'Instant Counter'
+                        : `${boss.region}${
+                            boss.isStygian72
+                              ? ' ✦ Stygian 7.2'
+                              : ` ✦ ${boss.category}`
+                          }`}
                     </span>
                   </div>
 
@@ -298,6 +401,18 @@ export function BossesView({
           );
         })}
 
+        {remainingCount > 0 && (
+          <div style={{ textAlign: 'center', padding: '18px 0 8px' }}>
+            <button
+              type="button"
+              className="btn-subtle"
+              onClick={() => setShowAllUnfiltered(true)}
+            >
+              Show all {filteredBosses.length} opponents ({remainingCount} more)
+            </button>
+          </div>
+        )}
+
         {bossMatchups.length === 0 && (
           <div
             style={{
@@ -306,7 +421,8 @@ export function BossesView({
               color: 'var(--text-3)',
             }}
           >
-            No bosses match your search.
+            No opponents match your search. Try typing an enemy name or element
+            (e.g. &ldquo;Anemo Hypostasis&rdquo; or &ldquo;Pyro Slime&rdquo;).
           </div>
         )}
       </div>

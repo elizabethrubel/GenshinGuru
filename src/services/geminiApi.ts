@@ -41,7 +41,7 @@ Rules:
       ? 'Include at least 1 Healer or Shielder for survivability.'
       : 'Glass Cannon mode allowed (healer/shielder optional).'
   }
-- Respect Genshin 7.x mechanics: Moonsign (2+ Moonsign units = Ascendant Gleam for Flins/Lauma/Zibai), Stellar Glimmer (Cryo + Electro = Stellar-Conduct for Cryo Traveller/Alyosha), and Chevreuse (Pyro + Electro only).
+- Respect Genshin 7.x mechanics: Moonsign (2+ Moonsign units = Ascendant Gleam for Flins/Lauma/Zibai), Stellar Glimmer (Cryo + Electro = Stellar-Conduct for Mitya/Cryo Traveller/Alyosha), and Chevreuse (Pyro + Electro only).
 - Return ONLY valid JSON with this exact schema:
 {
   "title": "Short team name",

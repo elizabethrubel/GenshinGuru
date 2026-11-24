@@ -7,9 +7,14 @@ import {
 } from 'lucide-react';
 import { ARCHETYPES } from '../data/archetypes';
 import { ENCOUNTERS } from '../data/encounters';
+import {
+  buildCustomEncounterFromQuery,
+  searchEncounters,
+} from '../engine/encounterResolver';
 import type {
   BuilderFilters,
   Character,
+  EncounterDefinition,
   RegionalPreset,
 } from '../types/genshin';
 import { BATTLE_READY_LEVEL } from '../engine/teamAnalyzer';
@@ -40,6 +45,13 @@ type OmniboxSuggestion =
       encounterId: string;
     }
   | {
+      kind: 'custom-opponent';
+      id: string;
+      title: string;
+      subtitle: string;
+      encounter: EncounterDefinition;
+    }
+  | {
       kind: 'region';
       id: string;
       title: string;
@@ -61,6 +73,35 @@ type OmniboxSuggestion =
       subtitle: string;
       archetypeId: string;
     };
+
+const ENCOUNTER_GROUPS: Array<{
+  label: string;
+  filter: (e: EncounterDefinition) => boolean;
+}> = [
+  {
+    label: 'Stygian Onslaught 7.2 & Snezhnaya',
+    filter: (e) => Boolean(e.isStygian72) || (e.region === 'Snezhnaya' && e.category !== 'Elite & Shields'),
+  },
+  {
+    label: 'Hypostases & Regisvines',
+    filter: (e) => e.category === 'Hypostasis & Regisvine',
+  },
+  {
+    label: 'Nod-Krai & Regional World Bosses',
+    filter: (e) =>
+      e.category === 'World Boss' &&
+      !e.isStygian72 &&
+      e.region !== 'Snezhnaya',
+  },
+  {
+    label: 'Weekly Trounce Bosses',
+    filter: (e) => e.category === 'Weekly Boss',
+  },
+  {
+    label: 'Elites & Elemental Shields',
+    filter: (e) => e.category === 'Elite & Shields',
+  },
+];
 
 export function FilterPanel({
   roster,
@@ -173,28 +214,21 @@ export function FilterPanel({
 
     const out: OmniboxSuggestion[] = [];
 
-    // 1. Bosses (name, region, keywords, or character drop name)
-    for (const enc of ENCOUNTERS) {
-      const hit =
-        enc.name.toLowerCase().includes(q) ||
-        enc.region.toLowerCase().includes(q) ||
-        enc.keywords.some((k) => k.includes(q)) ||
-        (enc.dropsFor?.some((d) => d.toLowerCase().includes(q)) ?? false);
-      if (hit) {
-        const dropNote =
-          enc.dropsFor && enc.dropsFor.length > 0
-            ? ` ✦ Drops for ${enc.dropsFor.join(', ')}`
-            : '';
-        out.push({
-          kind: 'boss',
-          id: `boss-${enc.id}`,
-          title: enc.name,
-          subtitle: `${enc.region} Boss${dropNote}`,
-          region: enc.region,
-          encounterId: enc.id,
-        });
-      }
-      if (out.length >= 4) break;
+    // 1. Opponents & Bosses (multi-token, alias-aware: e.g. "anemo hypostasis", "fire cube", "oceanid", "pyro shield")
+    const matchedEncounters = searchEncounters(queryText, ENCOUNTERS);
+    for (const enc of matchedEncounters.slice(0, 5)) {
+      const dropNote =
+        enc.dropsFor && enc.dropsFor.length > 0
+          ? ` ✦ Drops for ${enc.dropsFor.join(', ')}`
+          : '';
+      out.push({
+        kind: 'boss',
+        id: `boss-${enc.id}`,
+        title: enc.name,
+        subtitle: `${enc.region} · ${enc.category}${dropNote}`,
+        region: enc.region,
+        encounterId: enc.id,
+      });
     }
 
     // 2. Regions
@@ -213,7 +247,7 @@ export function FilterPanel({
           presetId: preset.id,
         });
         regionHits++;
-        if (regionHits >= 3) break;
+        if (regionHits >= 2) break;
       }
     }
 
@@ -234,7 +268,7 @@ export function FilterPanel({
           character: c,
         });
         charHits++;
-        if (charHits >= 4) break;
+        if (charHits >= 3) break;
       }
     }
 
@@ -252,6 +286,28 @@ export function FilterPanel({
           subtitle: arch.summary,
           archetypeId: arch.id,
         });
+      }
+    }
+
+    // 5. Dynamic Custom Opponent Counter (works for ANY enemy name like "Cryo Whopperflower" or "Pyro Specter"!)
+    const hasExactBossMatch = matchedEncounters.some(
+      (e) => e.name.toLowerCase() === q
+    );
+    if (q.length >= 3 && !hasExactBossMatch) {
+      const customEnc = buildCustomEncounterFromQuery(queryText);
+      if (customEnc) {
+        const customItem: OmniboxSuggestion = {
+          kind: 'custom-opponent',
+          id: `custom-${customEnc.id}`,
+          title: `Counter "${customEnc.name}"`,
+          subtitle: customEnc.tacticalTip,
+          encounter: customEnc,
+        };
+        if (matchedEncounters.length === 0 && out.length === 0) {
+          out.unshift(customItem);
+        } else {
+          out.push(customItem);
+        }
       }
     }
 
@@ -274,6 +330,17 @@ export function FilterPanel({
         ...filters,
         archetypeId: null,
         encounterId: item.encounterId,
+        customEncounter: null,
+        anchorCharacterId: null,
+      });
+      return;
+    }
+    if (item.kind === 'custom-opponent') {
+      onChangeFilters({
+        ...filters,
+        archetypeId: null,
+        encounterId: null,
+        customEncounter: item.encounter,
         anchorCharacterId: null,
       });
       return;
@@ -283,6 +350,7 @@ export function FilterPanel({
         ...filters,
         archetypeId: item.archetypeId,
         encounterId: null,
+        customEncounter: null,
         anchorCharacterId: null,
         includeUnbuilt:
           item.archetypeId === 'overloaded-chevreuse' ||
@@ -298,6 +366,7 @@ export function FilterPanel({
         ...filters,
         archetypeId: null,
         encounterId: null,
+        customEncounter: null,
         anchorCharacterId: item.character.id,
         includeUnbuilt:
           item.character.level < BATTLE_READY_LEVEL
@@ -313,9 +382,24 @@ export function FilterPanel({
       applySuggestion(suggestions[Math.min(activeIdx, suggestions.length - 1)]);
       return;
     }
-    if (hasGeminiKey && queryText.trim()) {
-      setIsOpen(false);
-      onAskGemini(queryText.trim());
+    if (queryText.trim()) {
+      const customEnc = buildCustomEncounterFromQuery(queryText);
+      if (customEnc) {
+        setIsOpen(false);
+        setQueryText('');
+        onChangeFilters({
+          ...filters,
+          archetypeId: null,
+          encounterId: null,
+          customEncounter: customEnc,
+          anchorCharacterId: null,
+        });
+        return;
+      }
+      if (hasGeminiKey) {
+        setIsOpen(false);
+        onAskGemini(queryText.trim());
+      }
     }
   };
 
@@ -323,6 +407,7 @@ export function FilterPanel({
     Boolean(selectedRegionId) ||
     Boolean(filters.archetypeId) ||
     Boolean(filters.encounterId) ||
+    Boolean(filters.customEncounter) ||
     Boolean(filters.anchorCharacterId);
 
   const activeAnchorChar = filters.anchorCharacterId
@@ -369,7 +454,7 @@ export function FilterPanel({
                 inputRef.current?.blur();
               }
             }}
-            placeholder="Jump to any boss, region, character, or reaction…"
+            placeholder="Search any opponent (e.g. Anemo Hypostasis), region, or character…"
             autoComplete="off"
           />
           <kbd className="kbd-hint" aria-hidden="true">
@@ -399,6 +484,8 @@ export function FilterPanel({
                       <CharacterPortrait character={item.character} size={28} />
                     ) : item.kind === 'archetype' ? (
                       <PrimogemStar size={14} color="var(--gold-bright)" />
+                    ) : item.kind === 'custom-opponent' ? (
+                      <Wand2 size={15} color="var(--gold-bright)" />
                     ) : (
                       <NationEmblem
                         nation={item.region}
@@ -413,12 +500,14 @@ export function FilterPanel({
                   </span>
                   <span className="omnibox-kind">
                     {item.kind === 'boss'
-                      ? 'Boss'
-                      : item.kind === 'region'
-                        ? 'Region'
-                        : item.kind === 'character'
-                          ? 'Anchor'
-                          : 'Reaction'}
+                      ? 'Opponent'
+                      : item.kind === 'custom-opponent'
+                        ? 'Custom'
+                        : item.kind === 'region'
+                          ? 'Region'
+                          : item.kind === 'character'
+                            ? 'Anchor'
+                            : 'Reaction'}
                   </span>
                 </button>
               ))}
@@ -442,10 +531,10 @@ export function FilterPanel({
           ))}
         </select>
 
-        {/* Boss Counter Dropdown */}
+        {/* Opponent Counter Dropdown (grouped by category) */}
         <select
           id="encounter-select"
-          aria-label="Boss or Encounter"
+          aria-label="Boss or Opponent"
           className={`inline-select ${filters.encounterId ? 'active-filter' : ''}`}
           value={filters.encounterId ?? ''}
           onChange={(e) =>
@@ -453,24 +542,35 @@ export function FilterPanel({
               ...filters,
               archetypeId: null,
               anchorCharacterId: null,
+              customEncounter: null,
               encounterId: e.target.value || null,
             })
           }
         >
-          <option value="">Boss Counter…</option>
-          {ENCOUNTERS.map((enc) => (
-            <option key={enc.id} value={enc.id}>
-              {enc.name}
-            </option>
-          ))}
+          <option value="">Opponent Counter…</option>
+          {ENCOUNTER_GROUPS.map((group) => {
+            const items = ENCOUNTERS.filter(group.filter);
+            if (items.length === 0) return null;
+            return (
+              <optgroup key={group.label} label={group.label}>
+                {items.map((enc) => (
+                  <option key={enc.id} value={enc.id}>
+                    {enc.name}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
         </select>
 
-        {/* Quiet active badge when anchored by character or reaction via omnibox/roster */}
-        {(activeAnchorChar || activeArch) && (
+        {/* Quiet active badge when anchored by character, reaction, or custom opponent */}
+        {(activeAnchorChar || activeArch || filters.customEncounter) && (
           <span className="active-scope-tag">
             {activeAnchorChar
               ? `Anchor: ${activeAnchorChar.name}`
-              : activeArch?.name}
+              : filters.customEncounter
+                ? `Counter: ${filters.customEncounter.name}`
+                : activeArch?.name}
           </span>
         )}
 
@@ -578,6 +678,7 @@ export function FilterPanel({
                 ...filters,
                 archetypeId: null,
                 encounterId: null,
+                customEncounter: null,
                 anchorCharacterId: null,
               });
             }}

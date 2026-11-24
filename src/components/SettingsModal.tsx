@@ -9,6 +9,10 @@ import {
 } from 'lucide-react';
 import type { AppSettings } from '../types/genshin';
 import { DEFAULT_SPREADSHEET_ID } from '../services/sheetsApi';
+import {
+  SNAPSHOT_CHARACTERS,
+  SNAPSHOT_PRESETS,
+} from '../data/rosterSnapshot';
 
 interface SettingsModalProps {
   settings: AppSettings;
@@ -62,7 +66,7 @@ export function SettingsModal({
             <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               {settings.dataSource === 'live-sheets' && settings.lastSyncedAt
                 ? `Last refreshed ${new Date(settings.lastSyncedAt).toLocaleString()}`
-                : 'Using bundled snapshot of your 34 characters & 17 regional teams'}
+                : `Using bundled snapshot of your ${SNAPSHOT_CHARACTERS.length} characters & ${SNAPSHOT_PRESETS.length} regional teams`}
             </div>
           </div>
           <button
