@@ -1002,7 +1002,6 @@ export async function askGuruSkill(
       generationConfig: {
         temperature: 0.45,
         responseMimeType: 'application/json',
-        thinkingConfig: { thinkingBudget: 0 },
       },
     })) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
