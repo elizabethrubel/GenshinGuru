@@ -68,6 +68,15 @@ function FormattedReply({ content }: { content: string }) {
         if (!trimmed) {
           return <div key={i} className="guru-reply-spacer" />;
         }
+        const headingMatch = trimmed.match(/^#{1,4}\s+(.+)$/);
+        if (headingMatch) {
+          return (
+            <div key={i} className="guru-reply-heading">
+              {renderInlineText(headingMatch[1])}
+            </div>
+          );
+        }
+
         const isBullet =
           trimmed.startsWith('• ') ||
           trimmed.startsWith('- ') ||

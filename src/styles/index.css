@@ -2586,6 +2586,14 @@ button {
   font-weight: 600;
 }
 
+.guru-reply-heading {
+  margin: 4px 0 1px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: -0.01em;
+}
+
 .guru-reply-para {
   margin: 0;
 }
