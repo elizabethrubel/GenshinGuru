@@ -35,13 +35,21 @@ import {
 } from './services/sheetsApi';
 import { askGenshinGuruGemini } from './services/geminiApi';
 import {
+  askGuruSkill,
+  type GuruChatMessage,
+} from './services/guruChatEngine';
+import {
+  loadChatHistory,
   loadSavedAbyssPairs,
   loadSavedTeams,
   loadSettings,
+  saveChatHistory,
   saveSavedAbyssPairs,
   saveSavedTeams,
   saveSettings,
+  type StoredChatEntry,
 } from './services/storage';
+import { GENSHIN_GURU_SKILL_URL } from './data/genshinGuruSkill';
 import { Header } from './components/Header';
 import { FilterPanel } from './components/FilterPanel';
 import {
@@ -60,6 +68,7 @@ import { SavedTeamsDrawer } from './components/SavedTeamsView';
 import { SettingsModal } from './components/SettingsModal';
 import { CelestialBackdrop } from './components/CelestialBackdrop';
 import { CharacterBuildDrawer } from './components/CharacterBuildDrawer';
+import { GuruChatSidebar } from './components/GuruChatSidebar';
 
 const EMPTY_SLOTS: [
   Character | null,
@@ -90,6 +99,133 @@ interface ToastState {
   onAction?: () => void;
 }
 
+function hydrateTeamFromIds(
+  ids: [string, string, string, string],
+  title: string,
+  whyItWorks: string,
+  charMap: Map<string, Character>
+): TeamRecommendation | undefined {
+  const members = ids
+    .map((id) => charMap.get(id))
+    .filter((c): c is Character => Boolean(c));
+  if (members.length !== 4) return undefined;
+  const tuple = members as [Character, Character, Character, Character];
+  const analysis = analyzeTeam(tuple);
+  return {
+    id: `guru-hydrated-${ids.join('-')}`,
+    title,
+    subtitle:
+      analysis.reactions
+        .slice(0, 3)
+        .map((r) => r.name)
+        .join(' · ') || 'Balanced Squad',
+    members: tuple,
+    slotLabels: inferSlotRoles(tuple),
+    analysis,
+    whyItWorks,
+    source: 'gemini',
+  };
+}
+
+function hydrateChatEntries(
+  entries: StoredChatEntry[],
+  roster: Character[]
+): GuruChatMessage[] {
+  const charMap = new Map(roster.map((c) => [c.id, c]));
+  return entries.map((e) => {
+    const suggestedTeam = e.suggestedTeam
+      ? hydrateTeamFromIds(
+          e.suggestedTeam.memberIds,
+          e.suggestedTeam.title,
+          e.suggestedTeam.whyItWorks,
+          charMap
+        )
+      : undefined;
+
+    let suggestedAbyss: GuruChatMessage['suggestedAbyss'];
+    if (e.suggestedAbyss) {
+      const h1 = hydrateTeamFromIds(
+        e.suggestedAbyss.half1Ids,
+        e.suggestedAbyss.half1Title,
+        'Abyss Half 1',
+        charMap
+      );
+      const h2 = hydrateTeamFromIds(
+        e.suggestedAbyss.half2Ids,
+        e.suggestedAbyss.half2Title,
+        'Abyss Half 2',
+        charMap
+      );
+      if (h1 && h2) {
+        suggestedAbyss = { half1: h1, half2: h2 };
+      }
+    }
+
+    const mentionedCharacters = e.mentionedCharacterIds
+      ?.map((id) => charMap.get(id))
+      .filter((c): c is Character => Boolean(c));
+
+    return {
+      id: e.id,
+      role: e.role,
+      content: e.content,
+      createdAt: e.createdAt,
+      engine: e.engine,
+      suggestedTeam,
+      suggestedAbyss,
+      mentionedCharacters:
+        mentionedCharacters && mentionedCharacters.length > 0
+          ? mentionedCharacters
+          : undefined,
+      followUps: e.followUps,
+      fallbackNote: e.fallbackNote,
+    };
+  });
+}
+
+function serializeChatMessages(messages: GuruChatMessage[]): StoredChatEntry[] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt,
+    engine: m.engine,
+    suggestedTeam: m.suggestedTeam
+      ? {
+          title: m.suggestedTeam.title,
+          whyItWorks: m.suggestedTeam.whyItWorks,
+          memberIds: m.suggestedTeam.members.map((c) => c.id) as [
+            string,
+            string,
+            string,
+            string,
+          ],
+        }
+      : undefined,
+    suggestedAbyss: m.suggestedAbyss
+      ? {
+          half1Title: m.suggestedAbyss.half1.title,
+          half1Ids: m.suggestedAbyss.half1.members.map((c) => c.id) as [
+            string,
+            string,
+            string,
+            string,
+          ],
+          half2Title: m.suggestedAbyss.half2.title,
+          half2Ids: m.suggestedAbyss.half2.members.map((c) => c.id) as [
+            string,
+            string,
+            string,
+            string,
+          ],
+        }
+      : undefined,
+    mentionedCharacterIds: m.mentionedCharacters?.map((c) => c.id),
+    followUps: m.followUps,
+    fallbackNote: m.fallbackNote,
+  }));
+}
+
 export default function App() {
   const [activeTab, setActiveTabState] = useState<ActiveTab>(() =>
     readTabFromHash()
@@ -102,6 +238,13 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showSavedDrawer, setShowSavedDrawer] = useState(false);
+
+  // Toggleable Genshin Guru Skill chat sidebar
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<GuruChatMessage[]>(() =>
+    hydrateChatEntries(loadChatHistory(), SNAPSHOT_CHARACTERS)
+  );
+  const [isChatThinking, setIsChatThinking] = useState(false);
 
   // Shared Character Build & Artifact drawer accessible from any tab
   const [inspectedCharacter, setInspectedCharacter] =
@@ -740,6 +883,91 @@ export default function App() {
     notify(`✦ Fate's Pick summoned ${chosen.title}`);
   };
 
+  // Cmd/Ctrl + / toggles the Genshin Guru skill chat sidebar from anywhere
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault();
+        setIsChatOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const handleSendGuruChat = async (question: string) => {
+    const userMsg: GuruChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: question,
+      createdAt: new Date().toISOString(),
+    };
+    const nextWithUser = [...chatMessages, userMsg];
+    setChatMessages(nextWithUser);
+    saveChatHistory(serializeChatMessages(nextWithUser));
+    setIsChatThinking(true);
+
+    try {
+      const reply = await askGuruSkill(question, {
+        roster,
+        presets,
+        activeTeam,
+        includeUnbuilt: filters.includeUnbuilt,
+        requireSurvivability: filters.requireSurvivability,
+        geminiApiKey: settings.geminiApiKey,
+        history: chatMessages,
+      });
+      const nextAll = [...nextWithUser, reply];
+      setChatMessages(nextAll);
+      saveChatHistory(serializeChatMessages(nextAll));
+    } finally {
+      setIsChatThinking(false);
+    }
+  };
+
+  const handleClearGuruChat = () => {
+    setChatMessages([]);
+    saveChatHistory([]);
+    notify('Cleared Genshin Guru chat.');
+  };
+
+  const handleLoadTeamFromChat = (team: TeamRecommendation) => {
+    setOriginContext(null);
+    setSelectedRegionId(null);
+    setSelectedRecId(null);
+    setManualSlots(team.members);
+    setManualTeam(team);
+    setFatesBurstKey((k) => k + 1);
+    setActiveTab('visualizer');
+    notify(`Loaded "${team.title}" into Team Circle.`);
+  };
+
+  const handleLoadAbyssPairFromChat = (
+    half1: TeamRecommendation,
+    half2: TeamRecommendation
+  ) => {
+    setHalf1Ids(
+      half1.members.map((m) => m.id) as [string, string, string, string]
+    );
+    setHalf2Ids(
+      half2.members.map((m) => m.id) as [string, string, string, string]
+    );
+    setHalf1Label(half1.title);
+    setHalf2Label(half2.title);
+    setActiveTab('abyss', true);
+    notify('Loaded both Genshin Guru squads into Spiral Abyss.');
+  };
+
+  const handleCopyAndOpenSkill = async (promptText: string) => {
+    try {
+      await navigator.clipboard.writeText(promptText);
+      notify('Copied your question — opening Genshin Guru Skill in Gemini.');
+    } catch {
+      notify('Opening Genshin Guru Skill in Gemini.');
+    }
+    window.open(GENSHIN_GURU_SKILL_URL, '_blank', 'noopener,noreferrer');
+  };
+
   // Dynamic ambient elemental sky mood matching the active party's dominant Vision
   const ambientElement: ElementType | 'Default' = useMemo(() => {
     if (activeTab !== 'visualizer') return 'Default';
@@ -768,6 +996,7 @@ export default function App() {
       className="app-shell"
       data-ambient={ambientElement}
       data-tab={activeTab}
+      data-chat-open={isChatOpen ? 'true' : 'false'}
     >
       <CelestialBackdrop ambientElement={ambientElement} />
       <Header
@@ -784,11 +1013,14 @@ export default function App() {
               : 'Character pool set to Battle-Ready (Lv 70+) across all tabs.'
           );
         }}
+        isChatOpen={isChatOpen}
+        onToggleChat={() => setIsChatOpen((v) => !v)}
         onOpenSettings={() => setShowSettings(true)}
         onOpenSavedDrawer={() => setShowSavedDrawer(true)}
       />
 
-      <main className="canvas">
+      <div className="workspace-body">
+        <main className="canvas">
         {activeTab === 'visualizer' && (
           <>
             <FilterPanel
@@ -982,7 +1214,27 @@ export default function App() {
             onBuildAroundCharacter={handleBuildAroundCharacter}
           />
         )}
-      </main>
+        </main>
+
+        <GuruChatSidebar
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          messages={chatMessages}
+          isThinking={isChatThinking}
+          hasGeminiKey={Boolean(settings.geminiApiKey.trim())}
+          roster={roster}
+          activeTeam={activeTeam}
+          includeUnbuilt={filters.includeUnbuilt}
+          onSendMessage={(q) => void handleSendGuruChat(q)}
+          onClearChat={handleClearGuruChat}
+          onLoadTeamInCircle={handleLoadTeamFromChat}
+          onSendToAbyss={handleSendToAbyss}
+          onLoadAbyssPair={handleLoadAbyssPairFromChat}
+          onInspectCharacter={(char) => setInspectedCharacter(char)}
+          onOpenSettings={() => setShowSettings(true)}
+          onCopyAndOpenSkill={(q) => void handleCopyAndOpenSkill(q)}
+        />
+      </div>
 
       {inspectedCharacter && (
         <CharacterBuildDrawer

@@ -8,6 +8,7 @@ import { DEFAULT_SPREADSHEET_ID } from './sheetsApi';
 const SETTINGS_KEY = 'genshin_guru_settings_v1';
 const SAVED_TEAMS_KEY = 'genshin_guru_saved_teams_v1';
 const SAVED_ABYSS_KEY = 'genshin_guru_saved_abyss_v1';
+const CHAT_HISTORY_KEY = 'genshin_guru_chat_history_v1';
 
 export function loadSettings(): AppSettings {
   const envSheetId =
@@ -85,3 +86,45 @@ export function saveSavedAbyssPairs(pairs: SavedAbyssPair[]): void {
     // ignore
   }
 }
+
+export interface StoredChatEntry {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  engine?: 'gemini-skill' | 'local-skill';
+  suggestedTeam?: {
+    title: string;
+    whyItWorks: string;
+    memberIds: [string, string, string, string];
+  };
+  suggestedAbyss?: {
+    half1Title: string;
+    half1Ids: [string, string, string, string];
+    half2Title: string;
+    half2Ids: [string, string, string, string];
+  };
+  mentionedCharacterIds?: string[];
+  followUps?: string[];
+  fallbackNote?: string;
+}
+
+export function loadChatHistory(): StoredChatEntry[] {
+  try {
+    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(-30) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveChatHistory(entries: StoredChatEntry[]): void {
+  try {
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(entries.slice(-30)));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+

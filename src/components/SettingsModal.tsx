@@ -187,7 +187,7 @@ export function SettingsModal({
 
           <div className="field-group">
             <label htmlFor="input-gemini-key" className="field-label">
-              Optional: Gemini API Key
+              Gemini API Key — Powers Live Genshin Guru Skill Chat
             </label>
             <input
               id="input-gemini-key"
@@ -195,8 +195,26 @@ export function SettingsModal({
               className="field-input"
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey(e.target.value)}
-              placeholder="AIzaSy… (optional for freeform boss queries)"
+              placeholder="AIzaSy… (optional — local Skill Engine works without a key)"
             />
+            <span className="field-help">
+              Runs your <strong>Genshin Guru</strong> skill prompt against your
+              live roster in the <strong>Ask Guru</strong> sidebar. Stored
+              locally in your browser.{' '}
+              <a
+                href="https://gemini.google.com/customize/skills/d/1JM8RQshXWZzkPCfENxN070R2hO9GyUJl?usp=sharing"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  color: 'var(--gold)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                View Gemini Skill <ExternalLink size={11} />
+              </a>
+            </span>
           </div>
 
           <div

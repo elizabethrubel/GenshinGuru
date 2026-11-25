@@ -1,4 +1,4 @@
-import { Bookmark, Settings } from 'lucide-react';
+import { Bookmark, MessageSquare, Settings } from 'lucide-react';
 import type { ActiveTab } from '../types/genshin';
 import { PrimogemStar } from './NationEmblem';
 
@@ -8,6 +8,8 @@ interface HeaderProps {
   savedCount: number;
   includeUnbuilt: boolean;
   onToggleIncludeUnbuilt: () => void;
+  isChatOpen: boolean;
+  onToggleChat: () => void;
   onOpenSettings: () => void;
   onOpenSavedDrawer: () => void;
 }
@@ -18,6 +20,8 @@ export function Header({
   savedCount,
   includeUnbuilt,
   onToggleIncludeUnbuilt,
+  isChatOpen,
+  onToggleChat,
   onOpenSettings,
   onOpenSavedDrawer,
 }: HeaderProps) {
@@ -106,6 +110,19 @@ export function Header({
           >
             <span className="readiness-dot" aria-hidden="true" />
             <span>{includeUnbuilt ? 'Pool: Lv 1–90' : 'Pool: Lv 70+'}</span>
+          </button>
+
+          <button
+            id="btn-toggle-guru-chat"
+            type="button"
+            className={`guru-toggle-btn ${isChatOpen ? 'active' : ''}`}
+            onClick={onToggleChat}
+            aria-expanded={isChatOpen}
+            aria-controls="guru-chat-sidebar"
+            title="Toggle Genshin Guru skill chat sidebar (⌘/)"
+          >
+            <MessageSquare size={13} />
+            <span>Ask Guru</span>
           </button>
 
           <button
