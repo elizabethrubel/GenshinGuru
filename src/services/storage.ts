@@ -35,6 +35,8 @@ export function loadSettings(): AppSettings {
       ...defaults,
       ...parsed,
       spreadsheetId: parsed.spreadsheetId || defaults.spreadsheetId,
+      sheetsApiKey: parsed.sheetsApiKey || defaults.sheetsApiKey,
+      geminiApiKey: parsed.geminiApiKey || defaults.geminiApiKey,
     };
   } catch {
     return defaults;

@@ -23,6 +23,7 @@ import type {
   RegionalPreset,
   TeamRecommendation,
 } from '../types/genshin';
+import { callGeminiGenerateContent } from './geminiApi';
 
 export interface GuruChatMessage {
   id: string;
@@ -992,38 +993,20 @@ export async function askGuruSkill(
     { role: 'user', parts: [{ text: query }] },
   ];
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
-    cleanKey
-  )}`;
-
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemPrompt }],
-        },
-        contents,
-        generationConfig: {
-          temperature: 0.45,
-          responseMimeType: 'application/json',
-        },
-      }),
-    });
+    const data = (await callGeminiGenerateContent(cleanKey, {
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      contents,
+      generationConfig: {
+        temperature: 0.45,
+        responseMimeType: 'application/json',
+      },
+    })) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
 
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try {
-        const err = await res.json();
-        if (err?.error?.message) detail = err.error.message;
-      } catch {
-        // ignore parse failure
-      }
-      throw new Error(`Gemini API error (${detail})`);
-    }
-
-    const data = await res.json();
     const rawText: string =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 

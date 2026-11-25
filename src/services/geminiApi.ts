@@ -1,6 +1,57 @@
 import type { Character, TeamRecommendation } from '../types/genshin';
 import { analyzeTeam, inferSlotRoles } from '../engine/teamAnalyzer';
 
+export async function callGeminiGenerateContent(
+  apiKey: string,
+  payload: Record<string, unknown>,
+  model = 'gemini-2.5-flash'
+): Promise<Record<string, unknown>> {
+  const cleanKey = apiKey.trim();
+  const encodedKey = encodeURIComponent(cleanKey);
+
+  const endpoints = [
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodedKey}`,
+  ];
+
+  // Google issues AQ.-prefixed keys for both AI Studio and Vertex AI Express Mode;
+  // try AI Studio first and automatically fall back to Vertex Express on 401/403.
+  if (cleanKey.startsWith('AQ.')) {
+    endpoints.push(
+      `https://aiplatform.googleapis.com/v1beta1/publishers/google/models/${model}:generateContent?key=${encodedKey}`
+    );
+  }
+
+  let lastDetail = 'Request failed';
+
+  for (let i = 0; i < endpoints.length; i++) {
+    const res = await fetch(endpoints[i], {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      return (await res.json()) as Record<string, unknown>;
+    }
+
+    lastDetail = `HTTP ${res.status}`;
+    try {
+      const err = (await res.json()) as { error?: { message?: string } };
+      if (err?.error?.message) lastDetail = err.error.message;
+    } catch {
+      // ignore parse errors
+    }
+
+    const canRetryFallback =
+      i + 1 < endpoints.length && (res.status === 401 || res.status === 403);
+    if (!canRetryFallback) {
+      break;
+    }
+  }
+
+  throw new Error(`Gemini API error (${lastDetail}).`);
+}
+
 export async function askGenshinGuruGemini(
   query: string,
   roster: Character[],
@@ -50,34 +101,16 @@ Rules:
   "whyItWorks": "2-3 concise sentences explaining why this team answers the player's question and how to play it."
 }`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
-    cleanKey
-  )}`;
+  const data = (await callGeminiGenerateContent(cleanKey, {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+    },
+  })) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const err = await res.json();
-      if (err?.error?.message) detail = err.error.message;
-    } catch {
-      // ignore
-    }
-    throw new Error(`Gemini API error (${detail}).`);
-  }
-
-  const data = await res.json();
   const rawText: string =
     data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 

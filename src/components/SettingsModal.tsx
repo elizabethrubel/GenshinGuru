@@ -195,7 +195,7 @@ export function SettingsModal({
               className="field-input"
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey(e.target.value)}
-              placeholder="AIzaSy… (optional — local Skill Engine works without a key)"
+              placeholder="AQ.… or AIzaSy… (optional — local Skill Engine works without a key)"
             />
             <span className="field-help">
               Runs your <strong>Genshin Guru</strong> skill prompt against your
