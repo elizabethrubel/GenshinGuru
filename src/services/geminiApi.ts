@@ -10,17 +10,89 @@ const GEMINI_MODELS = [
   'gemini-flash-lite-latest',
 ];
 
+export interface GeminiGenerateResult {
+  data: Record<string, unknown>;
+  model: string;
+}
+
+/**
+ * Checks whether the local Vite dev server proxy has a Gemini API key configured in .env.local.
+ */
+export async function checkServerGeminiStatus(): Promise<boolean> {
+  if (!import.meta.env.DEV) return false;
+  try {
+    const res = await fetch('/api/gemini-status');
+    if (!res.ok) return false;
+    const json = (await res.json()) as { configured?: boolean };
+    return Boolean(json.configured);
+  } catch {
+    return false;
+  }
+}
+
 export async function callGeminiGenerateContent(
   apiKey: string,
   payload: Record<string, unknown>,
   preferredModels: string[] = GEMINI_MODELS
-): Promise<Record<string, unknown>> {
+): Promise<GeminiGenerateResult> {
   const cleanKey = apiKey.trim();
-  const encodedKey = encodeURIComponent(cleanKey);
 
+  // In dev mode, route through the same-origin Vite proxy first so .env.local works
+  // reliably even across preview frames, browser CSP rules, or stale localStorage.
+  if (import.meta.env.DEV) {
+    try {
+      const proxyRes = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: cleanKey || undefined,
+          payload,
+          preferredModels,
+        }),
+      });
+
+      if (proxyRes.ok) {
+        const wrapped = (await proxyRes.json()) as {
+          data: Record<string, unknown>;
+          model?: string;
+        };
+        return {
+          data: wrapped.data,
+          model: wrapped.model || preferredModels[0] || 'gemini-3.6-flash',
+        };
+      }
+
+      if (proxyRes.status !== 404) {
+        let detail = `HTTP ${proxyRes.status}`;
+        try {
+          const err = (await proxyRes.json()) as { error?: string };
+          if (err?.error) detail = err.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(detail);
+      }
+    } catch (err) {
+      // If proxy explicitly returned an upstream Gemini error, surface it instead of masking
+      if (err instanceof Error && err.message.startsWith('Gemini API error')) {
+        throw err;
+      }
+      // Otherwise (e.g. non-browser Node/tsx test where /api/gemini doesn't exist),
+      // fall through to direct Gemini API call if we have a key.
+      if (!cleanKey) {
+        throw err instanceof Error ? err : new Error('Gemini proxy unavailable.');
+      }
+    }
+  }
+
+  if (!cleanKey) {
+    throw new Error(
+      'No Gemini API key configured. Add one in Sync & API Settings.'
+    );
+  }
+
+  const encodedKey = encodeURIComponent(cleanKey);
   const bases = ['https://generativelanguage.googleapis.com/v1beta/models'];
-  // Google issues AQ.-prefixed keys for both AI Studio and Vertex AI Express Mode;
-  // try AI Studio first and fall back to Vertex Express only if auth is rejected (401/403).
   if (cleanKey.startsWith('AQ.')) {
     bases.push(
       'https://aiplatform.googleapis.com/v1beta1/publishers/google/models'
@@ -41,7 +113,10 @@ export async function callGeminiGenerateContent(
       });
 
       if (res.ok) {
-        return (await res.json()) as Record<string, unknown>;
+        return {
+          data: (await res.json()) as Record<string, unknown>,
+          model,
+        };
       }
 
       lastDetail = `HTTP ${res.status}`;
@@ -57,7 +132,6 @@ export async function callGeminiGenerateContent(
         break;
       }
 
-      // Retry next model on deprecated/not-found (404), rate-limit (429), or high-demand (503)
       if (res.status === 404 || res.status === 429 || res.status === 503) {
         continue;
       }
@@ -81,11 +155,6 @@ export async function askGenshinGuruGemini(
   requireSurvivability: boolean
 ): Promise<TeamRecommendation> {
   const cleanKey = apiKey.trim();
-  if (!cleanKey) {
-    throw new Error(
-      'Add a Gemini API key in Sync & API Settings to run freeform AI queries.'
-    );
-  }
 
   const eligible = includeUnbuilt
     ? roster
@@ -122,18 +191,19 @@ Rules:
   "whyItWorks": "2-3 concise sentences explaining why this team answers the player's question and how to play it."
 }`;
 
-  const data = (await callGeminiGenerateContent(cleanKey, {
+  const { data } = await callGeminiGenerateContent(cleanKey, {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.3,
       responseMimeType: 'application/json',
     },
-  })) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
+  });
 
+  const candidates = data?.candidates as
+    | Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    | undefined;
   const rawText: string =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
   const parsed = JSON.parse(rawText) as {
     title?: string;

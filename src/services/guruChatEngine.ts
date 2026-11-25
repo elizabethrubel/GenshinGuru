@@ -31,6 +31,9 @@ export interface GuruChatMessage {
   content: string;
   createdAt: string;
   engine?: 'gemini-skill' | 'local-skill';
+  model?: string;
+  isError?: boolean;
+  retryQuery?: string;
   suggestedTeam?: TeamRecommendation;
   suggestedAbyss?: {
     half1: TeamRecommendation;
@@ -48,6 +51,7 @@ export interface GuruChatContext {
   includeUnbuilt: boolean;
   requireSurvivability: boolean;
   geminiApiKey: string;
+  serverGeminiAvailable?: boolean;
   history: GuruChatMessage[];
 }
 
@@ -916,6 +920,12 @@ function buildRosterContextForGemini(ctx: GuruChatContext): string {
 
   return `${GENSHIN_GURU_SKILL_INSTRUCTIONS}
 
+## Conversational Style & Reasoning Depth
+- Read the user's exact question carefully and respond thoughtfully like a knowledgeable, conversational Genshin Impact strategist talking directly to them — not a rigid template.
+- Explain the *why* behind your advice: discuss rotation flow, elemental aura / reaction uptime, energy funneling, trade-offs between options on their account, and how their exact character levels and unlocked constellations affect the decision.
+- If the user asks a nuanced, hypothetical, or multi-part question (e.g. comparing two characters, asking about future investment, tweaking a rotation, or asking why something feels clunky), address every part of their question directly and candidly.
+- Use clear structure (**bold**, short subheadings with ### when helpful, and • bullets) so your answer is thorough yet easy to scan in a sidebar.
+
 ## Live Genshin Roster (${ctx.roster.length} owned characters)
 ${rosterLines.join('\n')}
 
@@ -930,7 +940,7 @@ ${presetLines.join('\n')}
 ## Response Format
 Return ONLY valid JSON matching this schema:
 {
-  "reply": "Helpful, concise, markdown-friendly answer (use **bold** and bullet lists with •). Never expose internal file or spreadsheet IDs.",
+  "reply": "Your thoughtful, tailored, markdown-friendly response addressing the user's exact question. Never expose internal file or spreadsheet IDs.",
   "suggestedTeam": {
     "title": "Short team name",
     "members": ["Exact Name 1", "Exact Name 2", "Exact Name 3", "Exact Name 4"],
@@ -943,13 +953,13 @@ Return ONLY valid JSON matching this schema:
     "half2Members": ["Exact Name 5", "Exact Name 6", "Exact Name 7", "Exact Name 8"]
   },
   "mentionedCharacters": ["Exact Character Name"],
-  "followUps": ["Short follow-up question 1", "Short follow-up question 2"]
+  "followUps": ["Short thoughtful follow-up 1", "Short thoughtful follow-up 2"]
 }
 Notes on optional fields:
 - Only include "suggestedTeam" if recommending a single 4-character team (must use 4 distinct EXACT names from the Live Genshin Roster above). Otherwise omit it or set to null.
 - Only include "suggestedAbyss" if the user asked for two Spiral Abyss teams (must use 8 distinct EXACT names from the Live Genshin Roster above). Otherwise omit it or set to null.
-- Include up to 4 "mentionedCharacters" (EXACT names from the roster) when discussing builds or leveling priorities.
-- Include 2-3 short, useful "followUps".`;
+- Include up to 4 "mentionedCharacters" (EXACT names from the roster) when discussing builds, comparisons, or leveling priorities.
+- Include 2-3 context-specific "followUps" tailored to this conversation.`;
 }
 
 interface GeminiSkillJson {
@@ -969,6 +979,43 @@ interface GeminiSkillJson {
   followUps?: string[] | null;
 }
 
+function parseGeminiSkillJson(rawText: string): GeminiSkillJson {
+  const trimmed = rawText.trim();
+  if (!trimmed) return {};
+
+  // Strip optional ```json ... ``` markdown fences
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+
+  try {
+    return JSON.parse(candidate) as GeminiSkillJson;
+  } catch {
+    // Try extracting the outermost JSON object if Gemini added stray text around it
+    const firstBrace = candidate.indexOf('{');
+    const lastBrace = candidate.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(
+          candidate.slice(firstBrace, lastBrace + 1)
+        ) as GeminiSkillJson;
+      } catch {
+        // Fall through to returning raw markdown text directly
+      }
+    }
+    return { reply: trimmed };
+  }
+}
+
+function formatModelLabel(modelId: string): string {
+  return modelId
+    .replace(/^models\//, '')
+    .split('-')
+    .map((part) =>
+      part.length > 0 ? part[0].toUpperCase() + part.slice(1) : part
+    )
+    .join(' ');
+}
+
 /**
  * Live Gemini API call powered by the exact genshin-guru SKILL.md system prompt
  * and the user's live roster + conversation history.
@@ -978,15 +1025,20 @@ export async function askGuruSkill(
   ctx: GuruChatContext
 ): Promise<GuruChatMessage> {
   const cleanKey = ctx.geminiApiKey.trim();
-  if (!cleanKey) {
+  const useLiveGemini = Boolean(cleanKey || ctx.serverGeminiAvailable);
+
+  if (!useLiveGemini) {
     return askGuruSkillLocal(query, ctx);
   }
 
   const systemPrompt = buildRosterContextForGemini(ctx);
-  const recentHistory = ctx.history.slice(-8).map((m) => ({
-    role: m.role === 'user' ? 'user' : 'model',
-    parts: [{ text: m.content }],
-  }));
+  const recentHistory = ctx.history
+    .filter((m) => !m.isError)
+    .slice(-10)
+    .map((m) => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }],
+    }));
 
   const contents = [
     ...recentHistory,
@@ -994,26 +1046,27 @@ export async function askGuruSkill(
   ];
 
   try {
-    const data = (await callGeminiGenerateContent(cleanKey, {
+    const { data, model } = await callGeminiGenerateContent(cleanKey, {
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
       contents,
       generationConfig: {
-        temperature: 0.45,
+        temperature: 0.6,
         responseMimeType: 'application/json',
       },
-    })) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
+    });
 
+    const candidates = data?.candidates as
+      | Array<{ content?: { parts?: Array<{ text?: string }> } }>
+      | undefined;
     const rawText: string =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    const parsed = JSON.parse(rawText) as GeminiSkillJson;
+    const parsed = parseGeminiSkillJson(rawText);
     const replyText =
       parsed.reply?.trim() ||
-      'Here is my recommendation based on your Genshin Roster spreadsheet.';
+      'I received an empty response from Gemini — try asking again or rephrasing your question.';
 
     let suggestedTeam: TeamRecommendation | undefined;
     if (parsed.suggestedTeam?.members) {
@@ -1092,6 +1145,7 @@ export async function askGuruSkill(
       content: replyText,
       createdAt: new Date().toISOString(),
       engine: 'gemini-skill',
+      model: formatModelLabel(model),
       suggestedTeam,
       suggestedAbyss,
       mentionedCharacters:
@@ -1099,11 +1153,15 @@ export async function askGuruSkill(
       followUps,
     };
   } catch (err) {
-    const localReply = askGuruSkillLocal(query, ctx);
     const reason = err instanceof Error ? err.message : 'Gemini request failed';
     return {
-      ...localReply,
-      fallbackNote: `${reason} — answered with built-in Genshin Guru Skill Engine instead.`,
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      role: 'assistant',
+      content: `I couldn't reach Gemini right now (${reason}). Click **Retry** below to try again.`,
+      createdAt: new Date().toISOString(),
+      engine: 'gemini-skill',
+      isError: true,
+      retryQuery: query,
     };
   }
 }

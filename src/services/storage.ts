@@ -95,6 +95,7 @@ export interface StoredChatEntry {
   content: string;
   createdAt: string;
   engine?: 'gemini-skill' | 'local-skill';
+  model?: string;
   suggestedTeam?: {
     title: string;
     whyItWorks: string;

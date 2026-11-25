@@ -33,7 +33,10 @@ import {
   parseCharactersFromRows,
   parseDelimitedText,
 } from './services/sheetsApi';
-import { askGenshinGuruGemini } from './services/geminiApi';
+import {
+  askGenshinGuruGemini,
+  checkServerGeminiStatus,
+} from './services/geminiApi';
 import {
   askGuruSkill,
   type GuruChatMessage,
@@ -171,6 +174,7 @@ function hydrateChatEntries(
       content: e.content,
       createdAt: e.createdAt,
       engine: e.engine,
+      model: e.model,
       suggestedTeam,
       suggestedAbyss,
       mentionedCharacters:
@@ -190,6 +194,7 @@ function serializeChatMessages(messages: GuruChatMessage[]): StoredChatEntry[] {
     content: m.content,
     createdAt: m.createdAt,
     engine: m.engine,
+    model: m.model,
     suggestedTeam: m.suggestedTeam
       ? {
           title: m.suggestedTeam.title,
@@ -245,6 +250,12 @@ export default function App() {
     hydrateChatEntries(loadChatHistory(), SNAPSHOT_CHARACTERS)
   );
   const [isChatThinking, setIsChatThinking] = useState(false);
+  const [serverGeminiConfigured, setServerGeminiConfigured] = useState(false);
+
+  const envGeminiKey =
+    ((import.meta.env.VITE_GEMINI_API_KEY as string | undefined) || '').trim();
+  const effectiveGeminiKey = settings.geminiApiKey.trim() || envGeminiKey;
+  const hasLiveGemini = Boolean(effectiveGeminiKey || serverGeminiConfigured);
 
   // Shared Character Build & Artifact drawer accessible from any tab
   const [inspectedCharacter, setInspectedCharacter] =
@@ -624,7 +635,7 @@ export default function App() {
       const rec = await askGenshinGuruGemini(
         question,
         roster,
-        settings.geminiApiKey,
+        effectiveGeminiKey,
         filters.includeUnbuilt,
         filters.requireSurvivability
       );
@@ -895,6 +906,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    void checkServerGeminiStatus().then((ok) => {
+      if (active) setServerGeminiConfigured(ok);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleSendGuruChat = async (question: string) => {
     const userMsg: GuruChatMessage = {
       id: `user-${Date.now()}`,
@@ -914,7 +935,8 @@ export default function App() {
         activeTeam,
         includeUnbuilt: filters.includeUnbuilt,
         requireSurvivability: filters.requireSurvivability,
-        geminiApiKey: settings.geminiApiKey,
+        geminiApiKey: effectiveGeminiKey,
+        serverGeminiAvailable: serverGeminiConfigured,
         history: chatMessages,
       });
       const nextAll = [...nextWithUser, reply];
@@ -1036,7 +1058,7 @@ export default function App() {
                 setOriginContext(null);
                 handleChangeFilters(next);
               }}
-              hasGeminiKey={Boolean(settings.geminiApiKey)}
+              hasGeminiKey={hasLiveGemini}
               isAskingGemini={isAskingGemini}
               geminiError={geminiError}
               onAskGemini={(q) => void handleAskGemini(q)}
@@ -1221,7 +1243,7 @@ export default function App() {
           onClose={() => setIsChatOpen(false)}
           messages={chatMessages}
           isThinking={isChatThinking}
-          hasGeminiKey={Boolean(settings.geminiApiKey.trim())}
+          hasGeminiKey={hasLiveGemini}
           roster={roster}
           activeTeam={activeTeam}
           includeUnbuilt={filters.includeUnbuilt}

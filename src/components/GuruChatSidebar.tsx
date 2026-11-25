@@ -288,8 +288,10 @@ export function GuruChatSidebar({
                     <div className="guru-msg-meta">
                       <PrimogemStar size={10} color="var(--gold)" />
                       <span>Genshin Guru</span>
-                      {msg.engine === 'gemini-skill' && (
-                        <span className="guru-meta-tag">Gemini AI</span>
+                      {msg.engine === 'gemini-skill' && !msg.isError && (
+                        <span className="guru-meta-tag">
+                          {msg.model || 'Gemini AI'}
+                        </span>
                       )}
                     </div>
                   )}
@@ -299,6 +301,19 @@ export function GuruChatSidebar({
                       <div className="guru-user-text">{msg.content}</div>
                     ) : (
                       <FormattedReply content={msg.content} />
+                    )}
+
+                    {msg.isError && msg.retryQuery && (
+                      <div style={{ marginTop: 10 }}>
+                        <button
+                          type="button"
+                          className="btn-wish guru-card-primary"
+                          disabled={isThinking}
+                          onClick={() => onSendMessage(msg.retryQuery!)}
+                        >
+                          Retry with Gemini
+                        </button>
+                      </div>
                     )}
 
                     {msg.fallbackNote && (
@@ -511,7 +526,11 @@ export function GuruChatSidebar({
                   <span />
                   <span />
                 </span>
-                <span>Consulting your Genshin Roster…</span>
+                <span>
+                  {hasGeminiKey
+                    ? 'Gemini is thinking through your Genshin Roster…'
+                    : 'Consulting your Genshin Roster…'}
+                </span>
               </div>
             </div>
           )}
