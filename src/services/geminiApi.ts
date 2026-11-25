@@ -1,50 +1,70 @@
 import type { Character, TeamRecommendation } from '../types/genshin';
 import { analyzeTeam, inferSlotRoles } from '../engine/teamAnalyzer';
 
+const GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
+];
+
 export async function callGeminiGenerateContent(
   apiKey: string,
   payload: Record<string, unknown>,
-  model = 'gemini-2.5-flash'
+  preferredModels: string[] = GEMINI_MODELS
 ): Promise<Record<string, unknown>> {
   const cleanKey = apiKey.trim();
   const encodedKey = encodeURIComponent(cleanKey);
 
-  const endpoints = [
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodedKey}`,
-  ];
-
+  const bases = ['https://generativelanguage.googleapis.com/v1beta/models'];
   // Google issues AQ.-prefixed keys for both AI Studio and Vertex AI Express Mode;
-  // try AI Studio first and automatically fall back to Vertex Express on 401/403.
+  // try AI Studio first and fall back to Vertex Express only if auth is rejected (401/403).
   if (cleanKey.startsWith('AQ.')) {
-    endpoints.push(
-      `https://aiplatform.googleapis.com/v1beta1/publishers/google/models/${model}:generateContent?key=${encodedKey}`
+    bases.push(
+      'https://aiplatform.googleapis.com/v1beta1/publishers/google/models'
     );
   }
 
   let lastDetail = 'Request failed';
 
-  for (let i = 0; i < endpoints.length; i++) {
-    const res = await fetch(endpoints[i], {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  for (let b = 0; b < bases.length; b++) {
+    let authRejected = false;
 
-    if (res.ok) {
-      return (await res.json()) as Record<string, unknown>;
+    for (const model of preferredModels) {
+      const url = `${bases[b]}/${model}:generateContent?key=${encodedKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        return (await res.json()) as Record<string, unknown>;
+      }
+
+      lastDetail = `HTTP ${res.status}`;
+      try {
+        const err = (await res.json()) as { error?: { message?: string } };
+        if (err?.error?.message) lastDetail = err.error.message;
+      } catch {
+        // ignore parse errors
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        authRejected = true;
+        break;
+      }
+
+      // Retry next model on deprecated/not-found (404), rate-limit (429), or high-demand (503)
+      if (res.status === 404 || res.status === 429 || res.status === 503) {
+        continue;
+      }
+
+      throw new Error(`Gemini API error (${lastDetail}).`);
     }
 
-    lastDetail = `HTTP ${res.status}`;
-    try {
-      const err = (await res.json()) as { error?: { message?: string } };
-      if (err?.error?.message) lastDetail = err.error.message;
-    } catch {
-      // ignore parse errors
-    }
-
-    const canRetryFallback =
-      i + 1 < endpoints.length && (res.status === 401 || res.status === 403);
-    if (!canRetryFallback) {
+    if (!authRejected) {
       break;
     }
   }
